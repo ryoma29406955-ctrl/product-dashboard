@@ -139,6 +139,7 @@ function renderSummary(){
   const cur={amt:o.amt[L],units:o.units[L],buy:o.buy[L],uu:o.uu[L],pv:o.pv[L],fav:o.fav[L],cart:o.cart[L]};
   const prev=Pr>=0?{amt:o.amt[Pr],units:o.units[Pr],buy:o.buy[Pr],uu:o.uu[Pr],pv:o.pv[Pr],fav:o.fav[Pr],cart:o.cart[Pr]}:{amt:0,units:0,buy:0,uu:0,pv:0,fav:0,cart:0};
   const aov=b=>b.buy?Math.round(b.amt/b.buy):0, ipr=b=>b.units?Math.round(b.amt/b.units):0, cvrf=b=>b.uu?Math.round(b.buy/b.uu*1000)/10:0;
+  const favf=b=>b.uu?Math.round(b.fav/b.uu*1000)/10:0, favpvf=b=>b.pv?Math.round(b.fav/b.pv*1000)/10:0, f2bf=b=>b.fav?Math.round(b.buy/b.fav*1000)/10:0;
   let h=`<div class="kpis">
     ${kpiCard('受注高',yen(cur.amt),cur.amt,prev.amt,yen(prev.amt))}
     ${kpiCard('販売個数',cur.units.toLocaleString(),cur.units,prev.units,prev.units.toLocaleString())}
@@ -149,6 +150,9 @@ function renderSummary(){
     ${kpiCard('PV',cur.pv.toLocaleString(),cur.pv,prev.pv,prev.pv.toLocaleString())}
     ${kpiCard('CVR',cvrf(cur)+'%',cvrf(cur),cvrf(prev),cvrf(prev)+'%')}
     ${kpiCard('お気に入り',cur.fav.toLocaleString(),cur.fav,prev.fav,prev.fav.toLocaleString())}
+    ${kpiCard('お気に入り率(UU比)',favf(cur)+'%',favf(cur),favf(prev),favf(prev)+'%')}
+    ${kpiCard('お気に入り率(PV比)',favpvf(cur)+'%',favpvf(cur),favpvf(prev),favpvf(prev)+'%')}
+    ${kpiCard('お気→購入率',f2bf(cur)+'%',f2bf(cur),f2bf(prev),f2bf(prev)+'%')}
     ${kpiCard('カート投入数',cur.cart.toLocaleString(),cur.cart,prev.cart,prev.cart.toLocaleString())}
   </div>
   <div class="muted" style="margin:2px 0 12px">全体KPI（最新完全週 ${W[L]} / カッコ内は前週 ${W.length>1?W[Pr]:'—'}）。％にカーソルを置くと前週値を表示。</div>`;
@@ -157,6 +161,8 @@ function renderSummary(){
   const aovS=oo.amt.map((a,i)=>oo.buy[i]?Math.round(a/oo.buy[i]):0);
   const cvrS=oo.uu.map((u,i)=>u?Math.round(oo.buy[i]/u*1000)/10:0);
   const frS=oo.uu.map((u,i)=>u?Math.round(oo.fav[i]/u*1000)/10:0);
+  const frpvS=oo.pv.map((pvv,i)=>pvv?Math.round(oo.fav[i]/pvv*1000)/10:0);
+  const f2bS=oo.fav.map((fv,i)=>fv?Math.round(oo.buy[i]/fv*1000)/10:0);
   h+=`<div class="card"><h2>全体KPI 週次推移（全${W.length}週・各グラフ内で横スクロール） <button id="wbtn2" onclick="toggleWide('cgrid2','wbtn2')" style="font-size:11px;padding:3px 10px;border:1px solid #2e74b5;background:#fff;color:#2e74b5;border-radius:4px;cursor:pointer">⇔ 広げる</button></h2><div class="chartgrid" id="cgrid2">
     ${lineChart('受注高',oo.amt,'#1f497d')}
     ${lineChart('販売個数',oo.units,'#2e7d32')}
@@ -167,7 +173,9 @@ function renderSummary(){
     ${lineChart('お気に入り',oo.fav,'#26a69a')}
     ${lineChart('カート投入',oo.cart,'#5c6bc0')}
     ${lineChart('客単価',aovS,'#8e24aa')}
-    ${lineChart('お気に入り率 %',frS,'#00838f')}
+    ${lineChart('お気に入り率(UU比) %',frS,'#00838f')}
+    ${lineChart('お気に入り率(PV比) %',frpvS,'#00acc1')}
+    ${lineChart('お気→購入率 %',f2bS,'#7cb342')}
   </div></div>`;
   // movers
   const byU=[...P].filter(p=>{const pr=p.units[p.units.length-2]||0;return p.cur.units>=5&&pr>=5;}).sort((a,b)=>b.wow_units-a.wow_units);
@@ -179,11 +187,12 @@ function renderSummary(){
     <div class="col card"><h2>📉 落ちてる品番（受注 前週比・受注5以上）</h2><table class="movtbl">${movHead}${bot.map(moverRow).join('')}</table></div>
   </div>`;
   // category
-  const cats={};P.forEach(p=>{const c=p.c||'—';if(!cats[c])cats[c]={uu:0,units:0,n:0,cvr:0};cats[c].uu+=p.cur.uu;cats[c].units+=p.cur.units;cats[c].n++;if(p.cur.uu>0)cats[c].cvr+=p.cur.cvr;});
+  const cats={};P.forEach(p=>{const c=p.c||'—';if(!cats[c])cats[c]={uu:0,pv:0,units:0,n:0,cvr:0,fav:0,buy:0};cats[c].uu+=p.cur.uu;cats[c].pv+=(p.pv?p.pv[p.pv.length-1]:0)||0;cats[c].units+=p.cur.units;cats[c].n++;cats[c].fav+=(p.fav?p.fav[p.fav.length-1]:0)||0;cats[c].buy+=(p.buy?p.buy[p.buy.length-1]:0)||0;if(p.cur.uu>0)cats[c].cvr+=p.cur.cvr;});
   const carr=Object.entries(cats).sort((a,b)=>b[1].units-a[1].units);
   const mxU=Math.max(...carr.map(c=>c[1].units),1);
-  h+=`<div class="card"><h2>カテゴリ別（現在週）</h2><table><tr><th class="l">カテゴリ</th><th>型数</th><th>UU</th><th>受注</th><th>平均CVR</th><th class="l">受注規模</th></tr>`+
-    carr.map(([c,v])=>`<tr><td class="l">${c}</td><td>${v.n}</td><td>${v.uu.toLocaleString()}</td><td>${v.units.toLocaleString()}</td><td>${(v.cvr/Math.max(1,v.n)).toFixed(2)}%</td><td class="l"><span class="bar" style="width:${v.units/mxU*160}px"></span></td></tr>`).join('')+`</table></div>`;
+  const pc1=(a,b)=>b?(Math.round(a/b*1000)/10)+'%':'—';
+  h+=`<div class="card"><h2>カテゴリ別（現在週）</h2><table><tr><th class="l">カテゴリ</th><th>型数</th><th>UU</th><th>受注</th><th>平均CVR</th><th>お気に入り率<br>(UU比)</th><th>お気に入り率<br>(PV比)</th><th>お気→購入率</th><th class="l">受注規模</th></tr>`+
+    carr.map(([c,v])=>`<tr><td class="l">${c}</td><td>${v.n}</td><td>${v.uu.toLocaleString()}</td><td>${v.units.toLocaleString()}</td><td>${(v.cvr/Math.max(1,v.n)).toFixed(2)}%</td><td>${pc1(v.fav,v.uu)}</td><td>${pc1(v.fav,v.pv)}</td><td>${pc1(v.buy,v.fav)}</td><td class="l"><span class="bar" style="width:${v.units/mxU*160}px"></span></td></tr>`).join('')+`</table></div>`;
   document.getElementById('v-sum').innerHTML=h;
   scrollRight(document.getElementById('v-sum'));
 }
@@ -194,6 +203,7 @@ function kpiCardsFromO(o){
   const C={amt:o.amt[L],units:o.units[L],buy:o.buy[L],uu:o.uu[L],pv:o.pv[L],fav:o.fav[L],cart:o.cart[L]};
   const Pv=Pr>=0?{amt:o.amt[Pr],units:o.units[Pr],buy:o.buy[Pr],uu:o.uu[Pr],pv:o.pv[Pr],fav:o.fav[Pr],cart:o.cart[Pr]}:{amt:0,units:0,buy:0,uu:0,pv:0,fav:0,cart:0};
   const aov=b=>b.buy?Math.round(b.amt/b.buy):0,ipr=b=>b.units?Math.round(b.amt/b.units):0,cvrf=b=>b.uu?Math.round(b.buy/b.uu*1000)/10:0;
+  const favf=b=>b.uu?Math.round(b.fav/b.uu*1000)/10:0, favpvf=b=>b.pv?Math.round(b.fav/b.pv*1000)/10:0, f2bf=b=>b.fav?Math.round(b.buy/b.fav*1000)/10:0;
   return `<div class="kpis">
     ${kpiCard('受注高',yen(C.amt),C.amt,Pv.amt,yen(Pv.amt))}
     ${kpiCard('販売個数',C.units.toLocaleString(),C.units,Pv.units,Pv.units.toLocaleString())}
@@ -204,6 +214,9 @@ function kpiCardsFromO(o){
     ${kpiCard('PV',C.pv.toLocaleString(),C.pv,Pv.pv,Pv.pv.toLocaleString())}
     ${kpiCard('CVR',cvrf(C)+'%',cvrf(C),cvrf(Pv),cvrf(Pv)+'%')}
     ${kpiCard('お気に入り',C.fav.toLocaleString(),C.fav,Pv.fav,Pv.fav.toLocaleString())}
+    ${kpiCard('お気に入り率(UU比)',favf(C)+'%',favf(C),favf(Pv),favf(Pv)+'%')}
+    ${kpiCard('お気に入り率(PV比)',favpvf(C)+'%',favpvf(C),favpvf(Pv),favpvf(Pv)+'%')}
+    ${kpiCard('お気→購入率',f2bf(C)+'%',f2bf(C),f2bf(Pv),f2bf(Pv)+'%')}
     ${kpiCard('カート投入数',C.cart.toLocaleString(),C.cart,Pv.cart,Pv.cart.toLocaleString())}
   </div>`;
 }
@@ -213,11 +226,12 @@ function renderBrands(){
   const row=(name,o,cnt,bold)=>{
     const C={amt:o.amt[L],units:o.units[L],buy:o.buy[L],uu:o.uu[L],pv:o.pv[L],fav:o.fav[L],cart:o.cart[L]};
     const aov=C.buy?Math.round(C.amt/C.buy):0,ipr=C.units?Math.round(C.amt/C.units):0,cvr=C.uu?Math.round(C.buy/C.uu*1000)/10:0;
+    const favr=C.uu?Math.round(C.fav/C.uu*1000)/10:0,favpv=C.pv?Math.round(C.fav/C.pv*1000)/10:0,f2b=C.fav?Math.round(C.buy/C.fav*1000)/10:0;
     const b0=bold?'font-weight:bold;background:#eef3f9':'';
-    return `<tr style="${b0}"><td class="l"><b>${name}</b></td><td>${cnt}</td><td>${yen(C.amt)}</td><td>${C.units.toLocaleString()}</td><td>${C.buy.toLocaleString()}</td><td>${C.uu.toLocaleString()}</td><td>${C.pv.toLocaleString()}</td><td>${cvr}%</td><td>${C.fav.toLocaleString()}</td><td>${C.cart.toLocaleString()}</td><td>${yen(aov)}</td><td>${yen(ipr)}</td></tr>`;
+    return `<tr style="${b0}"><td class="l"><b>${name}</b></td><td>${cnt}</td><td>${yen(C.amt)}</td><td>${C.units.toLocaleString()}</td><td>${C.buy.toLocaleString()}</td><td>${C.uu.toLocaleString()}</td><td>${C.pv.toLocaleString()}</td><td>${cvr}%</td><td>${C.fav.toLocaleString()}</td><td>${favr}%</td><td>${favpv}%</td><td>${f2b}%</td><td>${C.cart.toLocaleString()}</td><td>${yen(aov)}</td><td>${yen(ipr)}</td></tr>`;
   };
   let h=`<div class="card"><h2>ブランド比較（最新完全週 ${W[L]}）</h2><div style="overflow:auto"><table>
-    <tr><th class="l">ブランド</th><th>品番数</th><th>受注高</th><th>販売個数</th><th>購入者数</th><th>UU</th><th>PV</th><th>CVR</th><th>お気に入り</th><th>カート</th><th>客単価</th><th>商品単価</th></tr>`;
+    <tr><th class="l">ブランド</th><th>品番数</th><th>受注高</th><th>販売個数</th><th>購入者数</th><th>UU</th><th>PV</th><th>CVR</th><th>お気に入り</th><th>お気に入り率<br>(UU比)</th><th>お気に入り率<br>(PV比)</th><th>お気→購入率</th><th>カート</th><th>客単価</th><th>商品単価</th></tr>`;
   brands.forEach(b=>{const pr=P.filter(p=>p.brand===b);h+=row(b,seriesFor(pr),pr.length,false);});
   h+=row('全体',seriesFor(P),P.length,true);
   h+='</table></div></div>';
