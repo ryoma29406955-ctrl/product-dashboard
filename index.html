@@ -462,13 +462,13 @@ function renderDiag(){
   if(!cur){h+=`<div class="note">当月データがありません。</div></div>`;host.innerHTML=h;return;}
   const rk=dgRank(brand);
   h+=`<h3 style="font-size:13px;color:#1f497d;margin:10px 0 6px">KPI悪化度ランキング（${brand}）<span class="muted" style="font-weight:normal">　並び順＝前年比悪化度の大きい順（制約判定は前年比のみ）。前月比・他ブランドは参考。</span></h3>
-    <div style="overflow-x:auto"><table><tr><th class="l">KPI</th><th>状態</th><th>当月</th><th>前年</th><th>前年比悪化度</th><th>前月比<br><span class="muted" style="font-weight:normal">(参考)</span></th><th>他ブランド中央値<br><span class="muted" style="font-weight:normal">(参考)</span></th><th>他ブランド比<br><span class="muted" style="font-weight:normal">(参考)</span></th></tr>`;
+    <div style="overflow-x:auto"><table><tr><th class="l">KPI</th><th>状態</th><th>当月</th><th>前年</th><th>前月<br><span class="muted" style="font-weight:normal">(${DG.mom_label})</span></th><th>前年比悪化度</th><th>前月比<br><span class="muted" style="font-weight:normal">(参考)</span></th><th>他ブランド中央値<br><span class="muted" style="font-weight:normal">(参考)</span></th><th>他ブランド比<br><span class="muted" style="font-weight:normal">(参考)</span></th></tr>`;
   rk.forEach((r,i)=>{
     const flag=i<2&&r.score!=null&&r.score>0?` <span class="${i==0?'flag':'flag2'}">${i==0?'制約候補':'第2'}</span>`:'';
     const cf=dgComposite(r.wy,r.wm);
     h+=`<tr><td class="l">${r.l}${flag}</td>
       <td>${cf?`<span class="flag" style="background:${cf.c}">${cf.l}</span>`:'—'}</td>
-      <td>${dgFmt(r.cv,r.fmt)}</td><td>${dgFmt(r.pv,r.fmt)}</td>
+      <td>${dgFmt(r.cv,r.fmt)}</td><td>${dgFmt(r.pv,r.fmt)}</td><td>${dgFmt(r.mv,r.fmt)}</td>
       <td class="${dgDevClass(r.wy)}">${r.wy==null?'—':(r.wy>=0?'+':'')+r.wy.toFixed(1)+'%'}</td>
       <td>${r.momPct==null?'<span class="muted">—</span>':(r.momPct>=0?'+':'')+r.momPct.toFixed(1)+'% '+dgMomArrow(r.wm)}</td>
       <td class="muted">${r.across?dgFmt(r.med,r.fmt):'規模系・対象外'}</td>
