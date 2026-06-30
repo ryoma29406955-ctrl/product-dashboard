@@ -408,15 +408,17 @@ function renderDiag(){
     <span class="todo">／ TODO: 目標基準・施策メモ・ガードレールは後で（フックのみ用意）</span></span></div></div>`;
   // ① 全ブランドの制約候補TOP1
   h+=`<div class="card"><h2>① 各ブランドの制約候補 TOP1（当月 ${DG.cur_ym} vs 前年 ${DG.prev_ym}）</h2>
-    <table><tr><th class="l">ブランド</th><th class="l">一番の制約</th><th>当月</th><th>前年</th><th>前年比悪化度</th><th>他ブランド比悪化度</th></tr>`;
+    <table><tr><th class="l">ブランド</th><th class="l">一番の制約</th><th>悪化度(採用)</th><th>当月</th><th>前年</th><th>前年比悪化度</th><th>他ブランド比悪化度</th></tr>`;
   DG.brands.forEach(b=>{
     const r=dgRank(b), top=r.find(x=>x.score!=null);
-    if(!top){h+=`<tr><td class="l"><b>${b}</b></td><td class="l muted">データ不足</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;return;}
+    if(!top){h+=`<tr><td class="l"><b>${b}</b></td><td class="l muted">データ不足</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`;return;}
+    const basis=(top.wy!=null&&(top.wa==null||top.wy>=top.wa))?'前年':(top.wa!=null?'他社':'—');
     h+=`<tr style="cursor:pointer" onclick="_dgb=${DG.brands.indexOf(b)};renderDiag()">
       <td class="l"><b>${b}</b></td><td class="l"><span class="flag">${top.l}</span></td>
+      <td class="${dgDevClass(top.score)}"><b>${top.score==null?'—':(top.score>=0?'+':'')+top.score.toFixed(1)+'%'}</b> <span class="muted">vs${basis}</span></td>
       <td>${dgFmt(top.cv,top.fmt)}</td><td>${dgFmt(top.pv,top.fmt)}</td>
-      <td class="${dgDevClass(top.wy)}">${top.wy==null?'—':top.wy.toFixed(1)+'%'}</td>
-      <td class="${dgDevClass(top.wa)}">${top.wa==null?'—':top.wa.toFixed(1)+'%'}</td></tr>`;
+      <td class="${dgDevClass(top.wy)}">${top.wy==null?'—':(top.wy>=0?'+':'')+top.wy.toFixed(1)+'%'}</td>
+      <td class="${dgDevClass(top.wa)}">${top.wa==null?'—':(top.wa>=0?'+':'')+top.wa.toFixed(1)+'%'}</td></tr>`;
   });
   h+=`</table><div class="muted" style="margin-top:5px">行クリックで詳細へ。悪化度: 赤=20%以上 / 黄=8%以上 / 緑=改善。</div></div>`;
   // ② ブランド個別
@@ -425,11 +427,17 @@ function renderDiag(){
   const brand=DG.brands[_dgb], cur=DG.raw[brand]&&DG.raw[brand].cur, prev=DG.raw[brand]&&DG.raw[brand].prev;
   if(!cur){h+=`<div class="note">当月データがありません。</div></div>`;host.innerHTML=h;return;}
   const rk=dgRank(brand);
-  h+=`<h3 style="font-size:13px;color:#1f497d;margin:10px 0 6px">KPI悪化度ランキング（${brand}）</h3>
-    <table><tr><th class="l">KPI</th><th>当月</th><th>前年</th><th>前年比悪化度</th><th>他ブランド中央値</th><th>他ブランド比悪化度</th></tr>`;
+  h+=`<h3 style="font-size:13px;color:#1f497d;margin:10px 0 6px">KPI悪化度ランキング（${brand}）<span class="muted" style="font-weight:normal">　並び順＝「悪化度(採用)」の大きい順（前年比・他社比の“悪い方”）</span></h3>
+    <table><tr><th class="l">KPI</th><th>悪化度(採用)</th><th>当月</th><th>前年</th><th>前年比悪化度</th><th>他ブランド中央値</th><th>他ブランド比悪化度</th></tr>`;
   rk.forEach((r,i)=>{
     const flag=i<2&&r.score!=null&&r.score>0?` <span class="${i==0?'flag':'flag2'}">${i==0?'制約候補':'第2'}</span>`:'';
-    h+=`<tr><td class="l">${r.l}${flag}</td><td>${dgFmt(r.cv,r.fmt)}</td><td>${dgFmt(r.pv,r.fmt)}</td>
+    // 採用された悪化度がどちらの基準（前年/他社）由来かを明示
+    const basis=(r.wy!=null&&(r.wa==null||r.wy>=r.wa))?'前年':(r.wa!=null?'他社':'—');
+    const scoreCell=r.score==null?'—'
+      :`<b>${(r.score>=0?'+':'')+r.score.toFixed(1)}%</b><br><span class="muted">vs${basis}</span>`;
+    h+=`<tr><td class="l">${r.l}${flag}</td>
+      <td class="${dgDevClass(r.score)}">${scoreCell}</td>
+      <td>${dgFmt(r.cv,r.fmt)}</td><td>${dgFmt(r.pv,r.fmt)}</td>
       <td class="${dgDevClass(r.wy)}">${r.wy==null?'—':(r.wy>=0?'+':'')+r.wy.toFixed(1)+'%'}</td>
       <td>${r.across?dgFmt(r.med,r.fmt):'<span class="muted">規模系・対象外</span>'}</td>
       <td class="${dgDevClass(r.wa)}">${r.wa==null?(r.across?'—':''):(r.wa>=0?'+':'')+r.wa.toFixed(1)+'%'}</td></tr>`;
