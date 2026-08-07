@@ -632,7 +632,7 @@ function evAnalyze(p,b){
   const mk=(r,g0,o0,d0)=>r>=g0?'◎':r>=o0?'○':r>=d0?'△':'✕';
   // 露出（UUパーセンタイル順位）
   const expo=evPctl(b.uuArr,tot.uu||0);
-  if(expo!=null){marks['露出']=expo>=0.70?'◎':expo>=0.45?'○':expo>=0.25?'△':'✕';det['露出']='上位'+Math.round((1-expo)*100)+'%';}
+  if(expo!=null){marks['露出']=expo>=0.70?'◎':expo>=0.45?'○':expo>=0.25?'△':'✕';det['露出']='上位'+Math.max(1,Math.round((1-expo)*100))+'%';}
   // 興味（お気に入り率 通算）
   const pFav=evSdiv(tot.fav,tot.uu); const pFavp=pFav!=null?pFav*100:null;
   if(b.favrate!=null&&pFavp!=null){marks['興味']=mk(pFavp/b.favrate,1.15,0.90,0.70);det['興味']=pFavp.toFixed(1)+'%/基準'+b.favrate.toFixed(1)+'%';}
@@ -708,7 +708,7 @@ function evStrengths(p,marks,b){
   const out=[];
   if(marks['モメンタム']==='◎'&&(p.wow_units||0)>=40)out.push('受注 前週比+'+p.wow_units+'%で急伸中。在庫を切らさず松で仕込みランキング上位を狙う');
   const expo=evPctl(b.uuArr,(p.tot&&p.tot.uu)||0);
-  if(marks['露出']==='◎'&&expo!=null)out.push('露出が強い（カテゴリ上位'+Math.round((1-expo)*100)+'%）。掲載/ランキングが効いている、順位維持を');
+  if(marks['露出']==='◎'&&expo!=null)out.push('露出が強い（カテゴリ上位'+Math.max(1,Math.round((1-expo)*100))+'%）。掲載/ランキングが効いている、順位維持を');
   const pFav=evSdiv(p.tot.fav,p.tot.uu);
   if(marks['興味']==='◎'&&b.favrate&&pFav!=null)out.push('お気に入り率がカテゴリ平均の'+(pFav*100/b.favrate).toFixed(1)+'倍。商品力が強い、露出を足せば伸びしろ大');
   if(marks['カート']==='◎')out.push('カート率が高く購入意欲が強い。在庫を厚くして取りこぼし防止');
