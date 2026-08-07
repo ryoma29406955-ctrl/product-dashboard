@@ -606,6 +606,192 @@ function renderBody(){
 }
 function setSort(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=-1;}renderTable();}
 
+// ==== 評価（自動診断：ファネル×カテゴリ・プールレート基準）====
+function evSdiv(a,b){return b>0?a/b:null;}
+function evPctl(arr,v){if(!arr||!arr.length)return null;let c=0;for(const x of arr)if(x<=v)c++;return c/arr.length;}
+function evPeers(p){
+  let g=P.filter(x=>x.sc===p.sc), scope='子:'+(p.sc||'—');
+  if(g.length<8){g=P.filter(x=>x.c===p.c); scope='親:'+(p.c||'—');}
+  if(g.length<8){g=P; scope='全体';}
+  return {g,scope};
+}
+const _evBench={};
+function evBenchFor(p){
+  const key=(p.sc||'')+'|'+(p.c||'');
+  if(_evBench[key])return _evBench[key];
+  const {g,scope}=evPeers(p);
+  const pr=(nk,dk)=>{let n=0,d=0;for(const q of g){const T=q.tot||{};n+=(T[nk]||0);d+=(T[dk]||0);}return d>0?n/d*100:null;};
+  const uuArr=g.map(x=>(x.tot&&x.tot.uu)||0).filter(x=>x>0).sort((a,b)=>a-b);
+  const b={scope,n:g.length,favrate:pr('fav','uu'),favrate_pv:pr('fav','pv'),cartrate:pr('cart','uu'),
+    cvr:pr('buy','uu'),fav2buy:pr('buy','fav'),uuArr};
+  _evBench[key]=b;return b;
+}
+// 段判定（地力=通算tot、勢い=前週比）。ベンチnullの段はN/Aでグレード分母から除外
+function evAnalyze(p,b){
+  const tot=p.tot||{}, marks={}, det={}, L=p.units.length-1;
+  const mk=(r,g0,o0,d0)=>r>=g0?'◎':r>=o0?'○':r>=d0?'△':'✕';
+  // 露出（UUパーセンタイル順位）
+  const expo=evPctl(b.uuArr,tot.uu||0);
+  if(expo!=null){marks['露出']=expo>=0.70?'◎':expo>=0.45?'○':expo>=0.25?'△':'✕';det['露出']='上位'+Math.round((1-expo)*100)+'%';}
+  // 興味（お気に入り率 通算）
+  const pFav=evSdiv(tot.fav,tot.uu); const pFavp=pFav!=null?pFav*100:null;
+  if(b.favrate!=null&&pFavp!=null){marks['興味']=mk(pFavp/b.favrate,1.15,0.90,0.70);det['興味']=pFavp.toFixed(1)+'%/基準'+b.favrate.toFixed(1)+'%';}
+  // カート（通算カート率）
+  const pCart=evSdiv(tot.cart,tot.uu); const pCartp=pCart!=null?pCart*100:null;
+  if(b.cartrate!=null&&pCartp!=null){marks['カート']=mk(pCartp/b.cartrate,1.10,0.85,0.60);det['カート']=pCartp.toFixed(1)+'%/基準'+b.cartrate.toFixed(1)+'%';}
+  // 転換（CVR 通算）＋ 保存止まり（お気→購入が極端に低い）
+  const pCVR=evSdiv(tot.buy,tot.uu); const pCVRp=pCVR!=null?pCVR*100:null;
+  const pF2=evSdiv(tot.buy,tot.fav); const pF2p=pF2!=null?pF2*100:null;
+  let saveStuck=false;
+  if(b.cvr!=null&&pCVRp!=null){marks['転換']=mk(pCVRp/b.cvr,1.10,0.85,0.60);det['転換']=pCVRp.toFixed(2)+'%/基準'+b.cvr.toFixed(2)+'%';
+    if(b.fav2buy!=null&&pF2p!=null&&pF2p<b.fav2buy*0.55)saveStuck=true;}
+  // セール依存（直近 商品単価 < 上代×0.85）
+  const ipr=(p.units[L]||0)?(p.amt[L]||0)/p.units[L]:0;
+  const saleDep=p.baika>0&&ipr>0&&ipr<p.baika*0.85;
+  // 在庫状態
+  const so=p.so||[]; const nw=p.nweeks||so.length||1; const win=Math.min(nw,12);
+  const soRate=so.length?so.slice(-Math.max(1,win)).filter(Boolean).length/Math.min(Math.max(1,win),so.length):0;
+  const cover=p.cover, hasCover=(cover!==''&&cover!=null);
+  const demand=(tot.units||0)>=50;
+  const rec4=p.buy.slice(-4).reduce((a,x)=>a+x,0);
+  let stockState='ok';
+  if(hasCover&&cover>=180)stockState='surplus';
+  else if(hasCover&&cover<28)stockState='shortage';
+  if(stockState!=='surplus'&&soRate>=0.5&&demand)stockState='shortage';
+  if(stockState==='ok'&&soRate===0&&(tot.units||0)>0&&rec4===0&&hasCover&&cover>=180)stockState='surplus';
+  if(stockState==='surplus')marks['在庫']='✕';
+  else if(stockState==='shortage')marks['在庫']=((hasCover&&cover<28)||soRate>=0.5)?'✕':'△';
+  else if(hasCover)marks['在庫']=(soRate===0&&cover>=42&&cover<180)?'◎':(soRate<0.25&&cover>=28)?'○':(cover<42?'△':'○');
+  if(hasCover)det['在庫']=(cover===''?'—':cover+'日');
+  // 広告（出稿ありのみ）
+  const hasAd=(tot.adcost||0)>0; let adState='na', roasTot=null;
+  if(hasAd){roasTot=evSdiv(tot.adrev,tot.adcost); roasTot=roasTot!=null?roasTot*100:null;
+    if(roasTot!=null){marks['広告']=roasTot>=300?'◎':roasTot>=200?'○':roasTot>=100?'△':'✕';adState=roasTot>=300?'good':roasTot<100?'bad':'ok';det['広告']='ROAS'+Math.round(roasTot)+'%';}}
+  // モメンタム（低ボリュームは判定不能）
+  const wu=p.wow_units||0;
+  if((p.units[L]||0)>=5){marks['モメンタム']=(wu>=40&&(p.wow_uu||0)>=0)?'◎':(wu>-15)?'○':(wu>-30)?'△':'✕';
+    if(soRate>=0.5&&marks['モメンタム']==='✕')marks['モメンタム']='○';
+    det['モメンタム']='前週比'+(wu>=0?'+':'')+wu+'%';}
+  return {marks,det,stockState,soRate,saveStuck,saleDep,hasAd,adState,pFav,pCVR};
+}
+function evGrade(p,marks,stockState,adState){
+  const thin=p.isnew||(p.nweeks||0)<6||((p.tot&&p.tot.uu)||0)<30;
+  if(thin)return {g:'新規',hold:true,score:null};
+  const SC={'◎':100,'○':75,'△':45,'✕':15};
+  const W={'露出':0.24,'興味':0.20,'カート':0.10,'転換':0.24,'モメンタム':0.12};
+  let num=0,den=0,firstBroken=null;
+  for(const k of ['露出','興味','カート','転換','モメンタム']){const m=marks[k];if(m==null||SC[m]==null)continue;
+    num+=SC[m]*W[k];den+=W[k];if(firstBroken===null&&(m==='△'||m==='✕'))firstBroken=k;}
+  let base=den>0?num/den:50;
+  const uT=(p.tot&&p.tot.units)||0; base+=uT>=2000?8:uT>=500?4:uT<50?-8:0;
+  if(firstBroken&&['露出','興味','転換'].includes(firstBroken)&&marks[firstBroken]==='✕')base-=12;
+  if(stockState==='shortage')base=Math.max(base,55);
+  if(adState==='good')base+=5;else if(adState==='bad')base-=8;
+  if(marks['モメンタム']==='◎')base+=3;else if(marks['モメンタム']==='✕')base-=3;
+  base=Math.max(0,Math.min(100,Math.round(base)));
+  return {g:base>=82?'S':base>=68?'A':base>=52?'B':base>=36?'C':'D',score:base,bottleneck:firstBroken};
+}
+function evBottleneck(p,marks,stockState,soRate){
+  if(p.isnew||(p.nweeks||0)<6)return {mode:'判断保留',sev:'low'};
+  const demand=((p.tot&&p.tot.units)||0)>=50, hasCover=(p.cover!==''&&p.cover!=null);
+  if(stockState==='shortage'&&((soRate>=0.5&&demand)||(hasCover&&p.cover<28)))return {mode:'欠品',sev:(hasCover&&p.cover<28)?'high':'mid'};
+  if(stockState==='surplus')return {mode:'余剰',sev:'high'};
+  const order=[['露出','露出不足'],['興味','刺さらない'],['カート','カート離脱'],['転換','転換不足']];
+  for(const[k,m]of order)if(marks[k]==='✕')return {stage:k,mode:m,sev:'high'};
+  for(const[k,m]of order)if(marks[k]==='△')return {stage:k,mode:m,sev:'mid'};
+  if(marks['モメンタム']==='✕')return {mode:'失速',sev:'mid'};
+  if(marks['広告']==='✕')return {mode:'広告非効率',sev:'high'};
+  if(marks['広告']==='△')return {mode:'広告非効率',sev:'mid'};
+  return {mode:'健全',sev:'low'};
+}
+function evStrengths(p,marks,b){
+  const out=[];
+  if(marks['モメンタム']==='◎'&&(p.wow_units||0)>=40)out.push('受注 前週比+'+p.wow_units+'%で急伸中。在庫を切らさず松で仕込みランキング上位を狙う');
+  const expo=evPctl(b.uuArr,(p.tot&&p.tot.uu)||0);
+  if(marks['露出']==='◎'&&expo!=null)out.push('露出が強い（カテゴリ上位'+Math.round((1-expo)*100)+'%）。掲載/ランキングが効いている、順位維持を');
+  const pFav=evSdiv(p.tot.fav,p.tot.uu);
+  if(marks['興味']==='◎'&&b.favrate&&pFav!=null)out.push('お気に入り率がカテゴリ平均の'+(pFav*100/b.favrate).toFixed(1)+'倍。商品力が強い、露出を足せば伸びしろ大');
+  if(marks['カート']==='◎')out.push('カート率が高く購入意欲が強い。在庫を厚くして取りこぼし防止');
+  const pCVR=evSdiv(p.tot.buy,p.tot.uu);
+  if(marks['転換']==='◎'&&b.cvr&&pCVR!=null)out.push('CVRがカテゴリ平均の'+(pCVR*100/b.cvr).toFixed(1)+'倍。価格・サイズ・レビューが揃い刈り取れている');
+  const rt=(p.tot&&p.tot.adcost)?p.tot.adrev/p.tot.adcost*100:0;
+  if(rt>=300)out.push('広告ROAS'+Math.round(rt)+'%と高効率。予算増額で伸ばせる');
+  if(((p.tot&&p.tot.units)||0)>=2000)out.push('通算'+p.tot.units.toLocaleString()+'枚の主力実績。安定した地力');
+  return out.slice(0,2);
+}
+const EV_COPY={
+'露出不足':{high:'UUがカテゴリ下位1/4で露出が根本課題。ランキング掲載枠（カテゴリ/新着）への露出を最優先し、1枚目サムネを競合上位の構図に差し替え。TS（タイムセール）登録で初速を作りランキングの雪だるまを起こす。',mid:'露出がカテゴリ中位以下。特集・ピックアップ枠への申請とTS登録でセール面回遊への露出を作る。1枚目画像のトンマナを売れ筋競合に寄せてクリック率を底上げ。'},
+'刺さらない':{high:'見られているがお気に入り率がカテゴリ比で大幅に低く第一印象で刺さっていない。1〜3枚目画像を刷新（着用/素材アップ/カラバリ明示）、上代が高いなら発売時クーポンや価格再検討で価格印象を調整、レビュー0なら初回レビュー獲得施策を実施。',mid:'興味段がやや弱い。ディテール訴求カット（袖/丈/透け感）とコーデ提案を追加し着回しを可視化。魅力の高い色をサムネ先頭に。PR/インフルエンサーで使用イメージを供給。'},
+'カート離脱':{high:'お気に入りは付くのにカート投入が弱く、サイズ迷い/在庫欠け/価格ためらいの疑い。サイズ表・実寸・着用スタッフ身長を拡充し欠けサイズを再入荷。お気に入り登録者向けクーポンやTS価格で最後の一押しを用意。',mid:'カート率がカテゴリ基準割れ。人気サイズを厚めに補充しレビューのサイズ感コメントを目立たせる。価格が理由なら期間限定クーポンでハードルを下げる。'},
+'転換不足':{high:'UU・お気に入りは十分だがCVRがカテゴリ比で低く最終購入で失速。レビュー獲得を集中施策化、サイズ欠けは即補充、プロパー比割高ならクーポン→通常価格で値付け適正化、購入者向けリピートクーポンで刈り取る。',mid:'転換がカテゴリ平均以下。値付けを近似競合（Musinsa/NUGU同型）と照合、サイズ/カラー別在庫の欠けをチェック、レビュー・Q&A拡充で購入不安を下げる。'},
+'保存止まり':{high:'お気に入りは多いが購入に転換しない（保存止まり）。再入荷/セール開始の通知を配信し、TS登録＋クーポンで登録者の背中を押す。欠品で待たせているなら予約設定を有効化して需要を確保する。'},
+'欠品':{high:'欠品週が半数以上で機会損失が発生中（需要はある）。人気サイズ/カラーを優先に再入荷発注（松シナリオ）、LT28日を見込み早期手配。入荷まで予約設定を有効化し離脱需要をバックログ確保、在庫復活バナー・再入荷通知で溜まった需要を一気に刈り取る。',mid:'一部週で欠品/サイズ欠けにより頭打ち。欠けサイズのスポット補充とサイズ欠け表示で他サイズへ誘導。カバー28日未満なら要即発注として発注リストに載せる。'},
+'余剰':{high:'在庫カバー日数が過大（180日超）で滞留。段階値下げ（登録者クーポン→TS価格→大型セール）で計画的に消化し、コーデ特集/クロスセルで露出を作る。売れ筋色サイズを先頭に出しキャッシュ化を優先、追加発注は停止。',mid:'在庫がやや余剰気味。特集掲載・まとめ買いクーポン・関連バンドルで回転を上げ、動きが鈍い色サイズから優先値引き。追加発注は当面停止。'},
+'広告非効率':{high:'ZOZOAD ROASが損益分岐（約200%）を割り広告赤字。低ROAS面の入札を停止し、CTRの低いサムネと商品ページ（画像・レビュー）を改善してから再開。予算は高ROAS品番へ振り替える。',mid:'ROASが薄利圏（100〜200%）。入札面別にROASを分解し低い面を停止、CPC高ければ除外KWとサムネ改善でCTR向上。広告経由率が高すぎる場合は自然流入強化を併走。'},
+'失速':{high:'受注が前週比で大幅減の失速（欠品起因を除く）。原因（欠品/ランキング落ち/競合セール/トレンド一巡）を特定し、順位低下ならTS/広告で露出を再点火。トレンド鈍化なら在庫を絞り追加発注は梅で抑制、消化モードへ。',mid:'モメンタム鈍化。次回TS登録を前倒しし、お気に入り登録者へクーポン通知でリエンゲージして需要を再点火。'},
+'急騰':{mid:'勢いが出ている。売れ筋サイズの在庫を厚めに保ちつつ次回TSへ登録し、バズ予兆として発注シナリオを一段引き上げるか検討する。'},
+'セール依存':{mid:'転換はあるがセール価格に依存し薄利。プロパーでの反応をクーポン→通常価格の導線で確認し、粗利率（手数料37%＋広告費＋下代）を踏まえTS依存から脱却できる価格を探る。'}
+};
+const EV_GCOL={'S':'#b8860b','A':'#2e7d32','B':'#1565c0','C':'#ef6c00','D':'#c62828','新規':'#757575'};
+function evMcol(m){return m==='◎'?'#1b7e3c':m==='○'?'#3f8ae0':m==='△'?'#ef6c00':m==='✕'?'#c62828':'#c0c6cc';}
+function evModeCol(mode){return mode==='欠品'?'#00838f':mode==='余剰'?'#6a1b9a':mode==='広告非効率'?'#ef6c00':mode==='健全'?'#2e7d32':mode==='判断保留'?'#757575':'#c62828';}
+function evalCard(p){
+  const b=evBenchFor(p);
+  const A=evAnalyze(p,b);
+  const G=evGrade(p,A.marks,A.stockState,A.adState);
+  const BN=G.hold?{mode:'判断保留',sev:'low'}:evBottleneck(p,A.marks,A.stockState,A.soRate);
+  const ST=G.hold?[]:evStrengths(p,A.marks,b);
+  // 一言サマリー
+  let summary;
+  if(G.hold)summary='データ蓄積中（発売'+(p.nweeks||0)+'週・判定保留）';
+  else if(BN.mode==='健全')summary='全ファネル良好。在庫を切らさず維持';
+  else if(BN.mode==='欠品')summary='需要はあるが欠品で機会損失（買えなかった＝需要失敗ではない）';
+  else if(BN.mode==='余剰')summary='売れる力はあるが在庫過多。消化が最優先';
+  else summary=BN.mode+'がボトルネック';
+  // 改善アクション（①ボトルネック→②③付随フラグ）
+  const acts=[];
+  const bnKey=(BN.mode==='転換不足'&&A.saveStuck)?'保存止まり':BN.mode;
+  if(EV_COPY[bnKey]){acts.push(EV_COPY[bnKey][BN.sev==='high'?'high':'mid']||EV_COPY[bnKey].high||EV_COPY[bnKey].mid);}
+  if(A.saveStuck&&bnKey!=='保存止まり'&&EV_COPY['保存止まり'])acts.push(EV_COPY['保存止まり'].high);
+  if(A.stockState==='surplus'&&BN.mode!=='余剰')acts.push(EV_COPY['余剰'].mid);
+  if((A.marks['広告']==='✕'||A.marks['広告']==='△')&&BN.mode!=='広告非効率')acts.push(EV_COPY['広告非効率'].mid);
+  if(A.marks['モメンタム']==='◎'&&(p.wow_units||0)>=40)acts.push(EV_COPY['急騰'].mid);
+  if(A.saleDep)acts.push(EV_COPY['セール依存'].mid);
+  const acts3=acts.slice(0,3);
+  // ファネルチップ
+  const CH=[['露出','露出'],['興味','興味'],['カート','カート'],['転換','転換'],['在庫','在庫'],['広告','広告'],['モメンタム','勢い']];
+  const chips=CH.map(([k,lab])=>{const m=A.marks[k],c=evMcol(m),v=A.det[k]||'';
+    const na=(m==null);const bd=(!G.hold&&BN.stage===k)?'2px solid #c62828':'1px solid #e0e4e8';
+    return `<div style="flex:0 0 auto;border:${bd};border-radius:7px;padding:5px 9px;background:${na?'#f5f6f8':'#fff};min-width:76px;text-align:center">
+      <div style="font-size:11px;color:#666">${lab}</div>
+      <div style="font-size:17px;font-weight:700;color:${na?'#c0c6cc':c};line-height:1.2">${na?'―':m}</div>
+      <div style="font-size:9px;color:#8a94a0">${na?'N/A':v}</div></div>`;}).join('');
+  const gcol=EV_GCOL[G.hold?'新規':G.g]||'#555';
+  const gtxt=G.hold?'新規':G.g;
+  const scoreTxt=G.hold?'判定保留':('スコア '+G.score+'/100');
+  const strHtml=ST.length?`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${ST.map(s=>`<span style="background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;border-radius:6px;padding:4px 9px;font-size:12px">💪 ${s}</span>`).join('')}</div>`:'';
+  const actHtml=acts3.length?`<ol style="margin:8px 0 0;padding-left:20px">${acts3.map(a=>`<li style="font-size:12.5px;color:#2c3540;margin-bottom:4px;line-height:1.5">${a}</li>`).join('')}</ol>`:'';
+  const mcol=evModeCol(BN.mode);
+  return `<div class="card" style="border-left:6px solid ${gcol}">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="background:${gcol};color:#fff;font-size:26px;font-weight:800;border-radius:10px;padding:4px 16px;min-width:56px;text-align:center">${gtxt}</span>
+      <div style="flex:1 1 auto;min-width:180px">
+        <div style="font-size:15px;font-weight:700;color:#222">評価：${summary}</div>
+        <div style="font-size:11px;color:#8a94a0">${scoreTxt}　｜　基準 ${b.scope}（n=${b.n}）　地力=通算・勢い=前週比</div>
+      </div>
+    </div>
+    ${(!G.hold&&BN.mode!=='健全')?`<div style="margin-top:9px;background:${mcol}14;border:1px solid ${mcol}55;border-left:5px solid ${mcol};border-radius:7px;padding:8px 12px">
+      <span style="color:${mcol};font-weight:800;font-size:13px">▍いま直すべき：${BN.mode}</span>
+      ${acts3.length?`<div style="font-size:12.5px;color:#2c3540;margin-top:4px;line-height:1.55">${acts3[0]}</div>`:''}</div>`:
+      (BN.mode==='健全'?`<div style="margin-top:9px;background:#2e7d3214;border:1px solid #2e7d3255;border-radius:7px;padding:8px 12px;color:#1b5e20;font-weight:700;font-size:13px">✔ ファネル健全。突出したボトルネックなし</div>`:'')}
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
+    ${strHtml}
+    ${acts3.length>1?`<div style="margin-top:6px;font-size:11px;color:#8a94a0;font-weight:600">改善アクション</div>${actHtml}`:''}
+    <div style="margin-top:8px;font-size:10.5px;color:#9aa4b0;line-height:1.5">
+      ※ ベンチはカテゴリ横断プールレート（Σ分子/Σ分母・通算）。露出はカテゴリ内UUパーセンタイル順位。単週の率は分母が小さく暴れるため地力は通算で評価。欠品週が半数以上は「買えなかった」として転換低下を減点対象外。${A.saleDep?'　｜　転換はセール価格に依存（薄利）の可能性。':''}${b.scope==='全体'?'　｜　カテゴリ標本が少なく全体基準を使用。':''}
+    </div></div>`;
+}
+
 // ---- DETAIL ----
 let lastH=null;
 function ensureDetail(){if(!lastH&&P.length)lastH=[...P].sort((a,b)=>b.cur.units-a.cur.units)[0].h;if(lastH)openDetail(lastH);}
@@ -660,6 +846,7 @@ function openDetail(h){
   let fh=funnel.map((f,i)=>{const rate=i>0?safeRate(f[1],funnel[1][1]):100;return `<div><span class="fb" style="background:${f[2]};width:${Math.max(40,f[1]/fmax*240)}px">${f[0]} ${f[1].toLocaleString()}</span> ${i>0?`<span class="muted">対UU ${rate}%</span>`:''}</div>`;}).join('');
   let h2=`<div class="card"><div class="dt-head"><span class="big">${p.n}</span>${p.isnew?'<span class="newb">NEW</span>':''}${p.brand?`<span class="pill" style="background:#1f497d;color:#fff">${p.brand}</span>`:''}<span class="pill">${p.c} / ${p.sc}</span><span class="muted">品番 ${p.h}</span>
     <span class="muted">発売日 ${p.rel||p.start||'—'}${p.isnew?'（初出）':''}　${p.isnew?'新商品：在庫・原価・売価は反映待ち':`原価¥${p.genka} 売価¥${p.baika} 在庫${p.stock.toLocaleString()}枚 カバー${p.cover===''?'—':p.cover+'日'}`}</span></div></div>
+    ${evalCard(p)}
     <div class="card"><h2>商品ポテンシャル（販売開始〜通算：${nw}週${p.start?' / '+p.start+'〜':''}）</h2><div class="kpis">
       ${pcard(T.units.toLocaleString(),'通算受注（総販売）')}
       ${pcard(yen(T.amt),'通算受注金額')}
