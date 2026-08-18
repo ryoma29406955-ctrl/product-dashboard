@@ -902,7 +902,7 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
   document.getElementById('v-'+b.dataset.v).classList.add('on');
-  if(b.dataset.v==='list'){renderList();requestAnimationFrame(()=>window.scrollTo(0,_listY));}else if(b.dataset.v!=='detail'){window.scrollTo(0,0);}
+  if(b.dataset.v==='list'){renderList();const y=_listY;const rst=()=>{void document.body.scrollHeight;window.scrollTo(0,y);};requestAnimationFrame(rst);setTimeout(rst,80);}else if(b.dataset.v!=='detail'){window.scrollTo(0,0);}
   if(b.dataset.v==='sum')renderSummary();if(b.dataset.v==='detail')ensureDetail();if(b.dataset.v==='brand')renderBrands();if(b.dataset.v==='month')renderMonth();if(b.dataset.v==='diag')renderDiag();
 });
 // ---- 独自ツールチップ（前週比%にホバーで前週値を即表示）----
