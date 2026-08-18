@@ -98,6 +98,7 @@ document.getElementById('gen').textContent = '生成: '+DATA.gen+' / 対象 '+P.
 
 // ---- helpers ----
 const yen=n=>'¥'+(n||0).toLocaleString();
+const zozoUrl=h=>'https://zozo.jp/shop/futierlandandsasa/search/?p_keyword='+encodeURIComponent(h);   // ZOZO商品番号未取得のため 御社ZOZO店(futierlandandsasa)内を品番で検索
 const pct=n=>(n==null||n==='')?'—':n+'%';
 function spark(vals,w=84,h=22,color='#2e74b5'){
   if(!vals||!vals.length)return'';
@@ -585,7 +586,7 @@ function renderBody(){
   let h='';
   rows.forEach(p=>{
     h+=`<tr onclick="openDetail('${p.h}')">
-      <td class="l"><b>${p.h}</b>${p.isnew?' <span class="newb">NEW</span>':''}</td>
+      <td class="l"><b>${p.h}</b> <a href="${zozoUrl(p.h)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="ZOZOで検索" style="text-decoration:none">🔗</a>${p.isnew?' <span class="newb">NEW</span>':''}</td>
       <td class="l">${p.brand||''}</td>
       <td class="l">${p.n.slice(0,24)}</td><td class="l"><span class="pill">${p.c}</span></td>
       <td>${(p.cur.pv||0).toLocaleString()}</td>
@@ -847,7 +848,7 @@ function openDetail(h){
   const funnel=[['PV',p.pv[L],'#90a4ae'],['UU',p.uu[L],'#42a5f5'],['カート',p.cart[L],'#5c6bc0'],['お気に入り',p.fav[L],'#26a69a'],['購入者',p.buy[L],'#2e7d32']];
   const fmax=Math.max(...funnel.map(f=>f[1]),1);
   let fh=funnel.map((f,i)=>{const rate=i>0?safeRate(f[1],funnel[1][1]):100;return `<div><span class="fb" style="background:${f[2]};width:${Math.max(40,f[1]/fmax*240)}px">${f[0]} ${f[1].toLocaleString()}</span> ${i>0?`<span class="muted">対UU ${rate}%</span>`:''}</div>`;}).join('');
-  let h2=`<div class="card"><div class="dt-head"><span class="big">${p.n}</span>${p.isnew?'<span class="newb">NEW</span>':''}${p.brand?`<span class="pill" style="background:#1f497d;color:#fff">${p.brand}</span>`:''}<span class="pill">${p.c} / ${p.sc}</span><span class="muted">品番 ${p.h}</span>
+  let h2=`<div class="card"><div class="dt-head"><span class="big">${p.n}</span>${p.isnew?'<span class="newb">NEW</span>':''}${p.brand?`<span class="pill" style="background:#1f497d;color:#fff">${p.brand}</span>`:''}<span class="pill">${p.c} / ${p.sc}</span><span class="muted">品番 ${p.h}</span><a href="${zozoUrl(p.h)}" target="_blank" rel="noopener" class="pill" style="background:#e5f0ff;color:#1f497d;text-decoration:none;border:1px solid #b8d4f5;font-weight:700">🔗 ZOZOで見る</a>
     <span class="muted">発売日 ${p.rel||p.start||'—'}${p.isnew?'（初出）':''}　${p.isnew?'新商品：在庫・原価・売価は反映待ち':`原価¥${p.genka} 売価¥${p.baika} 在庫${p.stock.toLocaleString()}枚 カバー${p.cover===''?'—':p.cover+'日'}`}</span></div></div>
     ${evalCard(p)}
     <div class="card"><h2>商品ポテンシャル（販売開始〜通算：${nw}週${p.start?' / '+p.start+'〜':''}）</h2><div class="kpis">
