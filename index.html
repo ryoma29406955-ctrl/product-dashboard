@@ -804,7 +804,8 @@ function ensureDetail(){if(!lastH&&P.length)lastH=[...P].sort((a,b)=>b.cur.units
 function openDetail(h){
   const p=P.find(x=>x.h===h);if(!p)return;
   lastH=h;
-  if(document.getElementById('v-list').classList.contains('on'))_listY=window.scrollY;   // 一覧から来たらスクロール位置を保存
+  const _lt=document.getElementById('lt');
+  if(_lt&&document.getElementById('v-list').classList.contains('on'))_listY=_lt.scrollTop;   // 一覧(コンテナ#lt)のスクロール位置を保存
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v==='detail'));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
   document.getElementById('v-detail').classList.add('on');
@@ -898,11 +899,12 @@ function scrollRight(root){requestAnimationFrame(()=>{(root||document).querySele
 
 // ---- tabs ----
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
-  if(document.getElementById('v-list').classList.contains('on'))_listY=window.scrollY;   // 一覧を離れる時に位置を保存
+  const _plt=document.getElementById('lt');
+  if(_plt&&document.getElementById('v-list').classList.contains('on'))_listY=_plt.scrollTop;   // 一覧(#lt)を離れる時に位置を保存
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
   document.getElementById('v-'+b.dataset.v).classList.add('on');
-  if(b.dataset.v==='list'){renderList();const y=_listY;const rst=()=>{void document.body.scrollHeight;window.scrollTo(0,y);};requestAnimationFrame(rst);setTimeout(rst,80);}else if(b.dataset.v!=='detail'){window.scrollTo(0,0);}
+  if(b.dataset.v==='list'){renderList();const y=_listY;const rst=()=>{const lt=document.getElementById('lt');if(lt){void lt.scrollHeight;lt.scrollTop=y;}};requestAnimationFrame(rst);setTimeout(rst,80);}else if(b.dataset.v!=='detail'){window.scrollTo(0,0);}
   if(b.dataset.v==='sum')renderSummary();if(b.dataset.v==='detail')ensureDetail();if(b.dataset.v==='brand')renderBrands();if(b.dataset.v==='month')renderMonth();if(b.dataset.v==='diag')renderDiag();
 });
 // ---- 独自ツールチップ（前週比%にホバーで前週値を即表示）----
