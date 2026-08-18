@@ -178,7 +178,7 @@ function renderSummary(){
     ${HAS_AD?kpiCard('ROAS',roasf(cur)+'%',roasf(cur),roasf(prev),roasf(prev)+'%'):''}
     ${HAS_AD?kpiCard('広告CTR',ctrf(cur)+'%',ctrf(cur),ctrf(prev),ctrf(prev)+'%'):''}
   </div>
-  <div class="muted" style="margin:2px 0 12px">全体KPI（最新完全週 ${W[L]} / カッコ内は前週 ${W.length>1?W[Pr]:'—'}）。％にカーソルを置くと前週値を表示。${HAS_AD?'　広告=ZOZOAD。':''}</div>`;
+  <div class="muted" style="margin:2px 0 12px">全体KPI（最新週 ${W[L]} / カッコ内は前週 ${W.length>1?W[Pr]:'—'}）。％にカーソルを置くと前週値を表示。${HAS_AD?'　広告=ZOZOAD。':''}</div>`;
   // 全体KPI 週次推移（KPIカードの直後・movers前）
   const oo=overallSeries();
   const aovS=oo.amt.map((a,i)=>oo.buy[i]?Math.round(a/oo.buy[i]):0);
@@ -256,14 +256,14 @@ function renderBrands(){
     const b0=bold?'font-weight:bold;background:#eef3f9':'';
     return `<tr style="${b0}"><td class="l"><b>${name}</b></td><td>${cnt}</td><td>${yen(C.amt)}</td><td>${C.units.toLocaleString()}</td><td>${C.buy.toLocaleString()}</td><td>${C.uu.toLocaleString()}</td><td>${C.pv.toLocaleString()}</td><td>${cvr}%</td><td>${C.fav.toLocaleString()}</td><td>${favr}%</td><td>${favpv}%</td><td>${f2b}%</td><td>${C.cart.toLocaleString()}</td><td>${yen(aov)}</td><td>${yen(ipr)}</td></tr>`;
   };
-  let h=`<div class="card"><h2>ブランド比較（最新完全週 ${W[L]}）</h2><div style="overflow:auto"><table>
+  let h=`<div class="card"><h2>ブランド比較（最新週 ${W[L]}）</h2><div style="overflow:auto"><table>
     <tr><th class="l">ブランド</th><th>品番数</th><th>受注高</th><th>販売個数</th><th>購入者数</th><th>UU</th><th>PV</th><th>CVR</th><th>お気に入り</th><th>お気に入り率<br>(UU比)</th><th>お気に入り率<br>(PV比)</th><th>お気→購入率</th><th>カート</th><th>客単価</th><th>商品単価</th></tr>`;
   brands.forEach(b=>{const pr=P.filter(p=>p.brand===b);h+=row(b,seriesFor(pr),pr.length,false);});
   h+=row('全体',seriesFor(P),P.length,true);
   h+='</table></div></div>';
   brands.forEach(b=>{
     const pr=P.filter(p=>p.brand===b);
-    h+=`<div class="card"><h2>${b}（${pr.length}品番）<span class="muted" style="font-weight:normal">　最新完全週 ${W[L]}・％にカーソルで前週値</span></h2>${kpiCardsFromO(seriesFor(pr))}</div>`;
+    h+=`<div class="card"><h2>${b}（${pr.length}品番）<span class="muted" style="font-weight:normal">　最新週 ${W[L]}・％にカーソルで前週値</span></h2>${kpiCardsFromO(seriesFor(pr))}</div>`;
   });
   document.getElementById('v-brand').innerHTML=h;
 }
