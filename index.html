@@ -759,13 +759,15 @@ function evalCard(p){
   if(A.saleDep)acts.push(EV_COPY['セール依存'].mid);
   const acts3=acts.slice(0,3);
   // ファネルチップ
-  const CH=[['露出','露出'],['興味','興味'],['カート','カート'],['転換','転換'],['在庫','在庫'],['広告','広告'],['モメンタム','勢い']];
-  const chips=CH.map(([k,lab])=>{const m=A.marks[k],c=evMcol(m),v=A.det[k]||'';
+  const CH=[['露出','露出','UU順位'],['興味','興味','お気に入り率'],['カート','カート','カート率'],
+            ['転換','転換','CVR(購入/UU)'],['在庫','在庫','カバー日数'],['広告','広告','ROAS'],['モメンタム','勢い','受注 前週比']];
+  const chips=CH.map(([k,lab,metric])=>{const m=A.marks[k],c=evMcol(m),v=A.det[k]||'';
     const na=(m==null);const bd=(!G.hold&&BN.stage===k)?'2px solid #c62828':'1px solid #e0e4e8';
-    return `<div style="flex:0 0 auto;border:${bd};border-radius:7px;padding:5px 9px;background:${na?'#f5f6f8':'#fff'};min-width:76px;text-align:center">
-      <div style="font-size:11px;color:#666">${lab}</div>
+    return `<div style="flex:0 0 auto;border:${bd};border-radius:7px;padding:5px 9px;background:${na?'#f5f6f8':'#fff'};min-width:88px;text-align:center">
+      <div style="font-size:11px;color:#666;font-weight:700">${lab}</div>
+      <div style="font-size:9px;color:#aab2bc;line-height:1.1;margin-bottom:1px">${metric}</div>
       <div style="font-size:17px;font-weight:700;color:${na?'#c0c6cc':c};line-height:1.2">${na?'―':m}</div>
-      <div style="font-size:9px;color:#8a94a0">${na?'N/A':v}</div></div>`;}).join('');
+      <div style="font-size:9.5px;color:#8a94a0">${na?'N/A':v}</div></div>`;}).join('');
   const gcol=EV_GCOL[G.hold?'新規':G.g]||'#555';
   const gtxt=G.hold?'新規':G.g;
   const scoreTxt=G.hold?'判定保留':('スコア '+G.score+'/100');
@@ -784,7 +786,8 @@ function evalCard(p){
       <span style="color:${mcol};font-weight:800;font-size:13px">▍いま直すべき：${BN.mode}</span>
       ${acts3.length?`<div style="font-size:12.5px;color:#2c3540;margin-top:4px;line-height:1.55">${acts3[0]}</div>`:''}</div>`:
       (BN.mode==='健全'?`<div style="margin-top:9px;background:#2e7d3214;border:1px solid #2e7d3255;border-radius:7px;padding:8px 12px;color:#1b5e20;font-weight:700;font-size:13px">✔ ファネル健全。突出したボトルネックなし</div>`:'')}
-    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
+    <div style="margin-top:10px;font-size:10px;color:#8a94a0">ファネル評価：見た(露出)→気に入った(興味)→カート→買った(転換)。<b style="color:#1b7e3c">◎</b>優 <b style="color:#3f8ae0">○</b>良 <b style="color:#ef6c00">△</b>注意 <b style="color:#c62828">✕</b>課題（この品番の通算値 vs 同カテゴリ平均=基準）</div>
+    <div style="margin-top:5px;display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
     ${strHtml}
     ${acts3.length>1?`<div style="margin-top:6px;font-size:11px;color:#8a94a0;font-weight:600">改善アクション</div>${actHtml}`:''}
     <div style="margin-top:8px;font-size:10.5px;color:#9aa4b0;line-height:1.5">
