@@ -11,6 +11,8 @@ header .gen{font-size:11px;opacity:.8;}
 .tabs{display:flex;gap:4px;margin-left:auto;}
 .tabs button{background:#2e74b5;color:#fff;border:none;padding:7px 16px;border-radius:5px 5px 0 0;cursor:pointer;font-size:13px;}
 .tabs button.on{background:#fff;color:#1f497d;font-weight:bold;}
+.navbtn{flex:0 0 auto;width:42px;height:42px;border-radius:50%;border:none;background:#2e74b5;color:#fff;font-size:18px;cursor:pointer;line-height:1;}
+.navbtn:hover{background:#1f497d;} .navbtn:disabled{background:#cbd0d6;cursor:default;}
 .wrap{padding:16px;}
 .view{display:none;} .view.on{display:block;}
 .card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:14px 16px;margin-bottom:14px;}
@@ -801,6 +803,12 @@ function evalCard(p){
 // ---- DETAIL ----
 let lastH=null, _listY=0;   // _listY=一覧のスクロール位置（個別追跡から戻った時に復元）
 function ensureDetail(){if(!lastH&&P.length)lastH=[...P].sort((a,b)=>b.cur.units-a.cur.units)[0].h;if(lastH)openDetail(lastH);}
+function detailNav(dir){   // 一覧・比較の並び順で前後の品番へ（◀=上/前、▶=下/次）
+  const rows=filteredSorted();
+  const i=rows.findIndex(x=>x.h===lastH);
+  if(i<0){if(rows.length)openDetail(rows[dir>0?0:rows.length-1].h);return;}
+  const j=i+dir; if(j>=0&&j<rows.length)openDetail(rows[j].h);
+}
 function openDetail(h){
   const p=P.find(x=>x.h===h);if(!p)return;
   lastH=h;
@@ -851,8 +859,13 @@ function openDetail(h){
       ${lineChart('ROAS %',roasSeries,'#c62828',p.so)}
       ${lineChart('広告CTR %',ctrSeries,'#ef6c00',p.so)}
     </div></div>` : '';
-  let h2=`<div class="card"><div class="dt-head"><span class="big">${p.n}</span>${p.isnew?'<span class="newb">NEW</span>':''}${p.brand?`<span class="pill" style="background:#1f497d;color:#fff">${p.brand}</span>`:''}<span class="pill">${p.c} / ${p.sc}</span><span class="muted">品番 ${p.h}</span><a href="${zozoUrl(p)}" target="_blank" rel="noopener" class="pill" style="background:#e5f0ff;color:#1f497d;text-decoration:none;border:1px solid #b8d4f5;font-weight:700">🔗 ZOZOで見る</a>
-    <span class="muted">発売日 ${p.rel||p.start||'—'}${p.isnew?'（初出）':''}　${p.isnew?'新商品：在庫・原価・売価は反映待ち':`原価¥${p.genka} 売価¥${p.baika} 在庫${p.stock.toLocaleString()}枚 カバー${p.cover===''?'—':p.cover+'日'}`}</span></div></div>
+  const _nr=filteredSorted(), _ni=_nr.findIndex(x=>x.h===p.h);
+  let h2=`<div class="card"><div style="display:flex;align-items:flex-start;gap:10px">
+    <button class="navbtn" onclick="detailNav(-1)" title="前の品番（一覧の上）"${_ni<=0?' disabled':''}>◀</button>
+    <div class="dt-head" style="flex:1;margin:0"><span class="big">${p.n}</span>${p.isnew?'<span class="newb">NEW</span>':''}${p.brand?`<span class="pill" style="background:#1f497d;color:#fff">${p.brand}</span>`:''}<span class="pill">${p.c} / ${p.sc}</span><span class="muted">品番 ${p.h}</span><a href="${zozoUrl(p)}" target="_blank" rel="noopener" class="pill" style="background:#e5f0ff;color:#1f497d;text-decoration:none;border:1px solid #b8d4f5;font-weight:700">🔗 ZOZOで見る</a>
+      <span class="muted">発売日 ${p.rel||p.start||'—'}${p.isnew?'（初出）':''}　${p.isnew?'新商品：在庫・原価・売価は反映待ち':`原価¥${p.genka} 売価¥${p.baika} 在庫${p.stock.toLocaleString()}枚 カバー${p.cover===''?'—':p.cover+'日'}`}</span></div>
+    <button class="navbtn" onclick="detailNav(1)" title="次の品番（一覧の下）"${_ni>=_nr.length-1?' disabled':''}>▶</button>
+  </div>${_ni>=0?`<div class="muted" style="margin-top:6px;text-align:center">一覧の並び順　${_ni+1} / ${_nr.length}　（←→キーでも移動）</div>`:''}</div>
     ${evalCard(p)}
     <div class="card"><h2>商品ポテンシャル（販売開始〜通算：${nw}週${p.start?' / '+p.start+'〜':''}）</h2><div class="kpis">
       ${pcard(T.units.toLocaleString(),'通算受注（総販売）')}
@@ -914,6 +927,12 @@ const _tip=document.createElement('div');_tip.id='tip';document.body.appendChild
 document.addEventListener('mouseover',e=>{const el=e.target.closest&&e.target.closest('[data-tip]');if(el&&el.dataset.tip){_tip.innerHTML=el.dataset.tip;_tip.style.display='block';}});
 document.addEventListener('mousemove',e=>{if(_tip.style.display==='block'){let x=e.clientX+14,y=e.clientY+16;if(x+260>window.innerWidth)x=e.clientX-250;_tip.style.left=x+'px';_tip.style.top=y+'px';}});
 document.addEventListener('mouseout',e=>{if(e.target.closest&&e.target.closest('[data-tip]'))_tip.style.display='none';});
+// 個別追跡で ←→ キーで前後の品番へ（一覧の並び順）
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('v-detail').classList.contains('on'))return;
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+  if(e.key==='ArrowRight')detailNav(1);else if(e.key==='ArrowLeft')detailNav(-1);
+});
 
 renderSummary();renderList();
 </script></body></html>
