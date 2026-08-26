@@ -845,14 +845,14 @@ function openDetail(h){
   const roasSeries=adc.map((c,i)=>c?Math.round(adr[i]/c*100):0), ctrSeries=adi.map((im,i)=>im?Math.round(adk[i]/im*10000)/100:0);
   const adSection = HAS_AD ? `<div class="card"><h2>広告（ZOZOAD）${hasAdP?'':'　<span class="muted">この商品は広告出稿なし</span>'}</h2>
     <div class="kpis">
-      ${pcard(yen(adTot.cost),'通算広告費')}${pcard(yen(adTot.rev),'通算経由売上')}${pcard(roasTot+'%','通算ROAS')}${pcard(adTot.ord.toLocaleString(),'通算経由件数')}${pcard(adTot.imp.toLocaleString(),'通算表示(imp)')}${pcard(ctrTot+'%','平均CTR')}
+      ${pcard(yen(adTot.cost),'通算広告費')}${pcard(yen(adTot.rev),'通算経由売上')}${pcard(roasTot+'%','通算ROAS')}${pcard(adTot.ord.toLocaleString(),'通算経由件数')}${pcard(adTot.imp.toLocaleString(),'通算表示(imp)')}${pcard(adTot.click.toLocaleString(),'通算クリック')}${pcard(ctrTot+'%','平均CTR')}
     </div>
     <div class="kpis" style="margin-top:8px">
       ${kpiCard('広告費(今週)',yen(adC),adC,pv0(adc[Pr]),yen(pv0(adc[Pr])))}
       ${kpiCard('経由売上(今週)',yen(adRevC),adRevC,pv0(adr[Pr]),yen(pv0(adr[Pr])))}
       ${kpiCard('ROAS',roasC+'%',roasC,roasP,roasP+'%')}
       ${kpiCard('広告経由率',adshC+'%',adshC,adshP,adshP+'%')}
-      ${pcard(ctrC+'%','CTR(今週)')}${pcard(yen(cpcC),'CPC(今週)')}
+      ${pcard(adKC.toLocaleString(),'クリック(今週)')}${pcard(ctrC+'%','CTR(今週)')}${pcard(yen(cpcC),'CPC(今週)')}
     </div>
     <div class="chartgrid" style="margin-top:10px">
       ${lineChart('広告費',adc,'#d81b60',p.so)}
