@@ -163,7 +163,7 @@ function renderSummary(){
   const prev=Pr>=0?{amt:o.amt[Pr],units:o.units[Pr],buy:o.buy[Pr],uu:o.uu[Pr],pv:o.pv[Pr],fav:o.fav[Pr],cart:o.cart[Pr],adcost:o.adcost[Pr],adrev:o.adrev[Pr],adimp:o.adimp[Pr],adclick:o.adclick[Pr]}:{amt:0,units:0,buy:0,uu:0,pv:0,fav:0,cart:0,adcost:0,adrev:0,adimp:0,adclick:0};
   const aov=b=>b.buy?Math.round(b.amt/b.buy):0, ipr=b=>b.units?Math.round(b.amt/b.units):0, cvrf=b=>b.uu?Math.round(b.buy/b.uu*1000)/10:0;
   const favf=b=>b.uu?Math.round(b.fav/b.uu*1000)/10:0, favpvf=b=>b.pv?Math.round(b.fav/b.pv*1000)/10:0, f2bf=b=>b.fav?Math.round(b.buy/b.fav*1000)/10:0;
-  const roasf=b=>b.adcost?Math.round(b.adrev/b.adcost*100):0, ctrf=b=>b.adimp?Math.round(b.adclick/b.adimp*1000)/10:0;
+  const roasf=b=>b.adcost?Math.round(b.adrev/b.adcost*100):0, ctrf=b=>b.adimp?Math.round(b.adclick/b.adimp*10000)/100:0;
   let h=`<div class="kpis">
     ${kpiCard('受注高',yen(cur.amt),cur.amt,prev.amt,yen(prev.amt))}
     ${kpiCard('販売個数',cur.units.toLocaleString(),cur.units,prev.units,prev.units.toLocaleString())}
@@ -837,12 +837,12 @@ function openDetail(h){
   const adc=p.adcost||[], adr=p.adrev||[], adi=p.adimp||[], adk=p.adclick||[];
   const adC=adc[L]||0, adRevC=adr[L]||0, adImC=adi[L]||0, adKC=adk[L]||0;
   const roasC=adC?Math.round(adRevC/adC*100):0, roasP=(Pr>=0&&adc[Pr])?Math.round(adr[Pr]/adc[Pr]*100):0;
-  const ctrC=adImC?Math.round(adKC/adImC*1000)/10:0, cpcC=adKC?Math.round(adC/adKC):0;
+  const ctrC=adImC?Math.round(adKC/adImC*10000)/100:0, cpcC=adKC?Math.round(adC/adKC):0;
   const adshC=p.amt[L]?Math.round(adRevC/p.amt[L]*1000)/10:0, adshP=(Pr>=0&&p.amt[Pr])?Math.round((adr[Pr]||0)/p.amt[Pr]*1000)/10:0;
   const adTot={cost:(p.tot&&p.tot.adcost)||0,rev:(p.tot&&p.tot.adrev)||0,ord:(p.tot&&p.tot.adord)||0,imp:(p.tot&&p.tot.adimp)||0,click:(p.tot&&p.tot.adclick)||0};
   const roasTot=adTot.cost?Math.round(adTot.rev/adTot.cost*100):0, hasAdP=adTot.cost>0;
-  const ctrTot=adTot.imp?Math.round(adTot.click/adTot.imp*1000)/10:0;
-  const roasSeries=adc.map((c,i)=>c?Math.round(adr[i]/c*100):0), ctrSeries=adi.map((im,i)=>im?Math.round(adk[i]/im*1000)/10:0);
+  const ctrTot=adTot.imp?Math.round(adTot.click/adTot.imp*10000)/100:0;
+  const roasSeries=adc.map((c,i)=>c?Math.round(adr[i]/c*100):0), ctrSeries=adi.map((im,i)=>im?Math.round(adk[i]/im*10000)/100:0);
   const adSection = HAS_AD ? `<div class="card"><h2>広告（ZOZOAD）${hasAdP?'':'　<span class="muted">この商品は広告出稿なし</span>'}</h2>
     <div class="kpis">
       ${pcard(yen(adTot.cost),'通算広告費')}${pcard(yen(adTot.rev),'通算経由売上')}${pcard(roasTot+'%','通算ROAS')}${pcard(adTot.ord.toLocaleString(),'通算経由件数')}${pcard(adTot.imp.toLocaleString(),'通算表示(imp)')}${pcard(ctrTot+'%','平均CTR')}
