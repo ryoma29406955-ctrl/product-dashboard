@@ -821,6 +821,7 @@ function openDetail(h){
   window.scrollTo(0,0);   // 個別追跡は先頭から表示
   const cvrSeries=p.uu.map((u,i)=>u?Math.round(p.buy[i]/u*1000)/10:0);
   const fav2Series=p.fav.map((f,i)=>f?Math.round(p.buy[i]/f*1000)/10:0);
+  const favpvSeries=p.pv.map((pvv,i)=>pvv?Math.round(p.fav[i]/pvv*1000)/10:0);
   // ---- 通算（商品ポテンシャル）----
   const T=p.tot||{units:0,amt:0,uu:0,pv:0,fav:0,cart:0,buy:0}, nw=p.nweeks||1;
   const r=(a,b)=>b?Math.round(a/b*1000)/10:0;
@@ -904,6 +905,7 @@ function openDetail(h){
       ${lineChart('受注点数（ZO）',p.units,'#2e7d32',p.so)}
       ${lineChart('CVR %（購入/UU）',cvrSeries,'#ef6c00',p.so)}
       ${lineChart('お気に入り→購入 %',fav2Series,'#8e24aa',p.so)}
+      ${lineChart('お気に入り率(PV比) %',favpvSeries,'#00acc1',p.so)}
       ${lineChart('PV（流入）',p.pv,'#90a4ae',p.so)}
     </div></div>
     <div><button onclick="goList()" style="padding:8px 16px;border:none;background:#2e74b5;color:#fff;border-radius:5px;cursor:pointer">← 一覧へ戻る</button></div>`;
