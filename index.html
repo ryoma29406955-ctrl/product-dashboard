@@ -853,9 +853,10 @@ function openDetail(h){
       ${kpiCard('経由売上(今週)',yen(adRevC),adRevC,pv0(adr[Pr]),yen(pv0(adr[Pr])))}
       ${kpiCard('ROAS',roasC+'%',roasC,roasP,roasP+'%')}
       ${kpiCard('広告経由率',adshC+'%',adshC,adshP,adshP+'%')}
-      ${pcard(adKC.toLocaleString(),'クリック(今週)')}${pcard(ctrC+'%','CTR(今週)')}${pcard(yen(cpcC),'CPC(今週)')}
+      ${pcard(adImC.toLocaleString(),'表示(今週)')}${pcard(adKC.toLocaleString(),'クリック(今週)')}${pcard(ctrC+'%','CTR(今週)')}${pcard(yen(cpcC),'CPC(今週)')}
     </div>
     <div class="chartgrid" style="margin-top:10px">
+      ${lineChart('表示(imp)',adi,'#5c6bc0',p.so)}
       ${lineChart('広告費',adc,'#d81b60',p.so)}
       ${lineChart('広告経由売上',adr,'#8e24aa',p.so)}
       ${lineChart('ROAS %',roasSeries,'#c62828',p.so)}
