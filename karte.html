@@ -1,0 +1,908 @@
+<title>商品カルテ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#f2f4f7; --panel:#ffffff; --panel2:#f7f9fb; --ink:#17212f; --ink2:#45536a; --muted:#768397;
+  --line:#dce2ea; --line2:#edf1f5; --grid:#e8ecf1;
+  --accent:#1f497d; --accent2:#2e74b5; --accent-soft:#e7eef8;
+  --good:#2e7d32; --good-bg:#e5f2e6; --warn:#a85a00; --warn-bg:#fcefd9; --crit:#c62828; --crit-bg:#fbe4e4;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s7:#4a3aa7;
+  --shadow:0 1px 2px rgba(23,33,47,.05),0 8px 24px rgba(23,33,47,.07);
+  --sans:"IBM Plex Sans","BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#10151c; --panel:#17202a; --panel2:#1c2530; --ink:#e8edf4; --ink2:#b4c0ce; --muted:#8592a4;
+    --line:#2a3542; --line2:#212b37; --grid:#243040;
+    --accent:#9bbde8; --accent2:#5d9be0; --accent-soft:#1d2b3e;
+    --good:#72c476; --good-bg:#1b3121; --warn:#f0a648; --warn-bg:#382911; --crit:#ef7474; --crit-bg:#3b1b1c;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s7:#9085e9;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }
+  :root:not([data-theme="light"]) .evg-S{--gc:#c9992e} :root:not([data-theme="light"]) .m-so{--mc:#3fb6c2} :root:not([data-theme="light"]) .m-sur{--mc:#b48ad8}
+  :root:not([data-theme="light"]) .ev-badge,:root:not([data-theme="light"]) .chip.evg{color:#10151c}
+}
+:root[data-theme="dark"] .evg-S{--gc:#c9992e} :root[data-theme="dark"] .m-so{--mc:#3fb6c2} :root[data-theme="dark"] .m-sur{--mc:#b48ad8}
+:root[data-theme="dark"] .ev-badge,:root[data-theme="dark"] .chip.evg{color:#10151c}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#10151c; --panel:#17202a; --panel2:#1c2530; --ink:#e8edf4; --ink2:#b4c0ce; --muted:#8592a4;
+  --line:#2a3542; --line2:#212b37; --grid:#243040;
+  --accent:#9bbde8; --accent2:#5d9be0; --accent-soft:#1d2b3e;
+  --good:#72c476; --good-bg:#1b3121; --warn:#f0a648; --warn-bg:#382911; --crit:#ef7474; --crit-bg:#3b1b1c;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s7:#9085e9;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.55;padding-inline:24px;padding-block:18px 48px}
+.app{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+/* top */
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.mark{display:flex;align-items:center;gap:10px}
+.mark b{font-family:"BIZ UDPGothic",var(--sans);font-size:15px;letter-spacing:.06em;color:var(--accent)}
+.trial{font-size:11px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.asof{font-size:11.5px;color:var(--muted)}
+/* picker */
+.picker{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pk{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 12px;display:flex;flex-direction:column;align-items:flex-start;min-width:150px;text-align:left}
+.pk small{color:var(--muted);font-size:11px}
+.pk span{font-size:12.5px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk[aria-pressed="true"]{border-color:var(--accent2);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent2)}
+.pk:hover{border-color:var(--accent2)}
+.navbtn{border:1px solid var(--line);background:var(--panel);border-radius:8px;width:34px;height:34px}
+/* product header */
+.phead{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 20px;display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.phead h1{font-family:"BIZ UDPGothic",var(--sans);font-size:19px;font-weight:700;margin:0;text-wrap:balance;max-width:760px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.chip{font-size:11.5px;padding:2px 9px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);color:var(--ink2)}
+.chip.strong{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.pricebox{display:flex;align-items:baseline;gap:10px}
+.pricebox .big{font-size:24px;font-weight:600}
+.pricebox .was{color:var(--muted);text-decoration:line-through}
+.off{font-weight:600;color:var(--s2)}
+.link{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:6px 12px;color:var(--accent);text-decoration:none;background:var(--panel)}
+.link:hover{border-color:var(--accent2)}
+/* tabbar */
+.tabbar{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:2px}
+.tab{background:none;border:none;padding:9px 16px 10px;font-size:14px;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent2);font-weight:600}
+.tab small{display:block;font-size:10.5px;color:var(--muted);font-weight:400}
+.controls{display:flex;gap:14px;align-items:center;padding-bottom:7px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:none;background:none;padding:5px 11px;font-size:12.5px;color:var(--ink2)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+.seg button:disabled{opacity:.35;cursor:not-allowed}
+.ctl-label{font-size:11.5px;color:var(--muted);margin-right:6px}
+/* panels */
+.grid{display:grid;gap:14px}
+.grid>*{min-width:0}
+.tw{overflow-x:auto;max-width:100%}
+#dTable{overscroll-behavior-x:contain;padding-bottom:4px}
+.g2{grid-template-columns:1fr 1fr}
+.g-side{grid-template-columns:minmax(0,1fr) 360px;align-items:start}
+.g-side>.grid{align-content:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+.ph h2{font-size:13px;margin:0;font-weight:600;letter-spacing:.03em;color:var(--ink)}
+.ph .sub{font-size:11.5px;color:var(--muted)}
+/* KPI strip */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.kpi{padding:12px 16px;display:flex;flex-direction:column;gap:2px}
+.kpi+.kpi{border-left:1px solid var(--line2)}
+.kpi .l{font-size:11.5px;color:var(--muted)}
+.kpi .v{font-size:21px;font-weight:600}
+.kpi .d{font-size:11.5px}
+.up{color:var(--good)} .down{color:var(--crit)} .flat{color:var(--muted)}
+.kpi .def{font-size:10.5px;color:var(--muted);margin-top:2px}
+.kpis.small .kpi{padding:9px 16px}
+.kpis.rates{grid-template-columns:repeat(6,minmax(0,1fr))}
+.band{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;margin-left:8px;vertical-align:middle;white-space:nowrap}
+.band.g{background:var(--good-bg);color:var(--good)} .band.y{background:var(--warn-bg);color:var(--warn)} .band.r{background:var(--crit-bg);color:var(--crit)}
+.tt td.bg-g{background:var(--good-bg)} .tt td.bg-y{background:var(--warn-bg)} .tt td.bg-r{background:var(--crit-bg)}
+.kpis.small .v{font-size:16px}
+/* 評価 */
+.evg-S{--gc:#b8860b}.evg-A{--gc:var(--good)}.evg-B{--gc:var(--accent2)}.evg-C{--gc:var(--warn)}.evg-D{--gc:var(--crit)}.evg-N{--gc:var(--muted)}
+.chip.evg{background:var(--gc);border-color:transparent;color:#fff;font-weight:600;cursor:pointer}
+.ev{border-left:5px solid var(--gc)}
+.ev-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:22px;align-items:start}
+.ev-head{display:flex;gap:12px;align-items:center}
+.ev-badge{background:var(--gc);color:#fff;font-size:24px;font-weight:700;border-radius:10px;min-width:56px;padding:2px 14px;text-align:center;line-height:1.45}
+.ev-sum{font-size:15px;font-weight:600}
+.ev-meta{font-size:11.5px;color:var(--muted)}
+.ev-fix{--mc:var(--crit);margin-top:12px;background:color-mix(in srgb,var(--mc) 7%,var(--panel));border:1px solid color-mix(in srgb,var(--mc) 28%,var(--panel));border-left:4px solid var(--mc);border-radius:8px;padding:9px 13px}
+.ev-fix b{color:var(--mc);font-size:13px}
+.ev-fix p{margin:4px 0 0;font-size:12.5px;line-height:1.65}
+.m-so{--mc:#00838f}.m-sur{--mc:#6a1b9a}.m-ad{--mc:var(--warn)}.m-ok{--mc:var(--good)}.m-hold{--mc:var(--muted)}.m-bad{--mc:var(--crit)}
+.ev-h3{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:12px}
+.ev-acts{margin:4px 0 0;padding-left:20px}
+.ev-acts li{font-size:12.5px;line-height:1.6;margin-bottom:4px}
+.ev-leg{font-size:11px;color:var(--muted);margin-bottom:6px}
+.ev-leg b{font-weight:700}
+.ev-chips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.evc{border:1px solid var(--line);border-radius:8px;padding:6px 6px;text-align:center;display:flex;flex-direction:column;background:var(--panel)}
+.evc.na{background:var(--panel2)}
+.evc.bn{border:2px solid var(--crit);padding:5px 5px}
+.evc-l{font-size:12px;font-weight:600;color:var(--ink2)}
+.evc-m{font-size:10px;color:var(--muted);line-height:1.2}
+.evc-v{font-size:19px;font-weight:700;line-height:1.3}
+.evc-d{font-size:10.5px;color:var(--muted)}
+.mk-a{color:var(--good)}.mk-b{color:var(--s1)}.mk-c{color:var(--warn)}.mk-d{color:var(--crit)}.mk-na{color:var(--line)}
+.ev-str{display:flex;flex-direction:column;gap:5px;margin-top:10px}
+.ev-str span{background:var(--good-bg);color:var(--good);border-radius:7px;padding:5px 10px;font-size:12px;line-height:1.5}
+.ev-note{margin-top:12px;font-size:10.5px;color:var(--muted);line-height:1.55;border-top:1px solid var(--line2);padding-top:8px}
+.blockhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.blockhead h2{font-size:13px;margin:0;font-weight:600}
+.blockhead .sub{font-size:11.5px;color:var(--muted)}
+.bh-l{display:flex;align-items:center;gap:12px}
+.seg.sm button{padding:3px 11px;font-size:12px}
+.gapnote{color:var(--warn)}
+.tip table{border-collapse:collapse;width:100%;font-size:11.5px}
+.tip th,.tip td{padding:2px 0 2px 10px;border:none;text-align:right;white-space:nowrap}
+.tip th{color:var(--muted);font-weight:400;font-size:10.5px}
+.tip td:first-child,.tip th:first-child{text-align:left;padding-left:0;color:var(--ink2)}
+.tt tr.sep td{border-top:2px solid var(--line)}
+/* insight list */
+.notes{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.notes li{display:grid;grid-template-columns:72px 1fr;gap:10px;align-items:start;padding:8px 0;border-top:1px solid var(--line2)}
+.notes li:first-child{border-top:none}
+.notes .t{font-size:12.5px}
+.notes .t small{display:block;color:var(--muted);font-size:11.5px}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;text-align:center;white-space:nowrap}
+.pill.crit{background:var(--crit-bg);color:var(--crit)} .pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.good{background:var(--good-bg);color:var(--good)} .pill.info{background:var(--accent-soft);color:var(--accent)}
+.pill.mute{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+/* tables */
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{font-weight:500;color:var(--muted);font-size:11.5px;text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--line2);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+th.l,td.l{text-align:left}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover{background:var(--panel2)}
+.sw{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid var(--line);vertical-align:-1px;margin-right:7px}
+.share{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+.share i{display:block;height:7px;border-radius:2px;background:var(--grid);width:64px;position:relative;overflow:hidden}
+.share i b{position:absolute;left:0;top:0;bottom:0;border-radius:2px}
+.code{font-size:11.5px;color:var(--muted)}
+.tt{width:auto}
+.tt th,.tt td{padding:6px 9px}
+.tt th small{display:block;font-size:10px;color:var(--muted)}
+.tt .stk{position:sticky;left:0;z-index:1;background:var(--panel);text-align:left;border-right:1px solid var(--line);font-weight:500;color:var(--ink)}
+.tt th.stk{color:var(--muted)}
+.tt .sun{background:var(--panel2)}
+.tt tbody tr:hover td{background:var(--accent-soft)}
+/* charts */
+.chart{position:relative;width:100%}
+.chart svg{display:block;overflow:visible}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink2);margin-bottom:6px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.stack{display:flex;flex-direction:column;gap:2px}
+.row-title{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);padding:6px 2px 0}
+.row-title b{font-weight:600;color:var(--ink)}
+details summary{cursor:pointer;color:var(--accent);font-size:12.5px;padding:6px 0}
+.empty{color:var(--muted);padding:28px 0;text-align:center}
+.foot{font-size:11.5px;color:var(--muted)}
+/* tooltip */
+.tip{position:fixed;z-index:30;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:8px 10px;font-size:12px;min-width:170px;display:none}
+.tip h4{margin:0 0 4px;font-size:12px}
+.tip .r{display:flex;justify-content:space-between;gap:16px;font-variant-numeric:tabular-nums}
+.tip .r span:first-child{color:var(--ink2);display:inline-flex;align-items:center;gap:6px}
+.tip i{display:inline-block;width:8px;height:8px;border-radius:2px}
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,16,24,.18);opacity:0;pointer-events:none;transition:opacity .18s}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:420px;max-width:92vw;background:var(--panel);border-left:1px solid var(--line);box-shadow:var(--shadow);transform:translateX(100%);transition:transform .2s ease;z-index:20;display:flex;flex-direction:column}
+.drawer.on{transform:none}
+.dh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:16px 18px 10px;border-bottom:1px solid var(--line)}
+.dh h3{margin:0;font-size:15px}
+.dh .sub{font-size:11.5px;color:var(--muted)}
+.dclose{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:4px 10px}
+.db{padding:12px 18px 24px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:12.5px}
+.kv span:nth-child(odd){color:var(--ink2)}
+.kv span:nth-child(even){text-align:right;font-variant-numeric:tabular-nums}
+.dsec h4{margin:0 0 6px;font-size:12px;color:var(--muted);font-weight:500;letter-spacing:.03em}
+@media (prefers-reduced-motion: reduce){.drawer,.scrim{transition:none}}
+@media (max-width:1100px){.ev-grid{grid-template-columns:1fr}.g-side{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(3,1fr)}.kpi:nth-child(4){border-left:none}.kpis.rates{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:640px){.g2{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}body{padding-inline:16px}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="mark"><b>商品カルテ</b></div>
+    <div class="asof" id="asof"></div>
+  </header>
+  <nav class="picker" id="picker" aria-label="品番の切り替え"></nav>
+  <section class="phead" id="phead"></section>
+  <div class="tabbar">
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="controls">
+      <div><span class="ctl-label">期間</span><span class="seg" id="segPeriod"></span></div>
+      <div><span class="ctl-label">粒度</span><span class="seg" id="segGran"></span></div>
+    </div>
+  </div>
+  <main id="view"></main>
+</div>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="dtitle">
+  <div class="dh"><div><h3 id="dtitle"></h3><div class="sub" id="dsub"></div></div><button class="dclose" id="dclose">閉じる</button></div>
+  <div class="db" id="dbody"></div>
+</aside>
+<div class="tip" id="tip"></div>
+
+<script src="karte_data.js"></script>
+<script>
+const D = window.KARTE_DATA;
+if (!D) document.body.innerHTML = '<p style="padding:24px">カルテのデータ（karte_data.js）が見つかりません。商品ステータスと同じフォルダに置いてください。</p>';
+const EMBED = window.parent !== window;   // 商品ステータスの「商品カルテ」タブの中で開かれている
+const $ = s => document.querySelector(s);
+const P = D.products, KEYS = D.order || Object.keys(P);
+const DAYS = D.days.map(s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); });
+const N = DAYS.length, DOW = '日月火水木金土';
+const idxOf = s => D.days.indexOf(s);
+const SKU_END = idxOf(D.asof['売上集計']), RANK_END = idxOf(D.asof['ランキング']);
+const md = d => (d.getMonth() + 1) + '/' + d.getDate();
+const mdw = d => md(d) + '(' + DOW[d.getDay()] + ')';
+const yen = v => v == null || !isFinite(v) ? '—' : '¥' + Math.round(v).toLocaleString('ja-JP');
+const num = (v, dg = 0) => v == null || !isFinite(v) ? '—' : Number(v).toLocaleString('ja-JP', { maximumFractionDigits: dg, minimumFractionDigits: dg });
+const pct = (v, dg = 1) => v == null || !isFinite(v) ? '—' : (v * 100).toFixed(dg) + '%';
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function lastIdx(a) { for (let i = a.length - 1; i >= 0; i--) if (a[i] != null) return i; return -1; }
+function firstIdx(a) { for (let i = 0; i < a.length; i++) if (a[i] != null) return i; return -1; }
+function sumR(a, s, e) { let t = 0, n = 0; for (let i = Math.max(0, s); i <= e; i++) if (a[i] != null) { t += a[i]; n++; } return n ? t : null; }
+const sumZ = (a, s, e) => sumR(a, s, e) || 0;
+function meanR(a, s, e) { let t = 0, n = 0; for (let i = Math.max(0, s); i <= e; i++) if (a[i] != null) { t += a[i]; n++; } return n ? t / n : null; }
+const SWATCH = { 'ブルー': '#4f7fbf', 'ライトグレー': '#cfd3d8', 'グレー': '#8f949a', 'ピンク': '#e8aebd', 'ネイビー': '#2a3a5e', 'ブラウン': '#7b563b',
+  'レッド': '#b8403e', 'チャコールグレー': '#4b4f55', 'オフホワイト': '#efece4', 'ライトブルー': '#9fc0e2', 'ピスタチオ': '#b5c98e', 'ライトパープル': '#b7a6d6', 'ベージュ': '#d9c6a5', 'アイボリー': '#efe8d6', 'ブラック': '#222428', 'ホワイト': '#f7f7f5', 'グリーン': '#4f7a4a', 'イエロー': '#e2c04c', 'オレンジ': '#e08a3c' };
+
+const hashP = () => { const h = decodeURIComponent(location.hash.slice(1)); return P[h] ? h : null; };
+const state = { span: '7d', p: hashP() || KEYS[0], tab: 'overview', period: '60', gran: 'day', tableOpen: true, dmode: 'rate' };
+const TABS = [['overview', '概要', '今どうなっているか'], ['daily', '日次', 'いつ何が動いたか'], ['sku', 'SKU', 'どの色が売れて、どれが切れるか'], ['ad', '広告', '広告は回収できているか']];
+
+/* ---------- 期間・バケット ---------- */
+function prStart(pr) { const c = [firstIdx(pr.pv), firstIdx(pr.units), firstIdx(pr.ad.cost)].filter(x => x >= 0); return c.length ? Math.min(...c) : 0; }
+function range() { const pr = P[state.p], e = N - 1, s0 = prStart(pr); return [state.period === 'all' ? s0 : Math.max(e - (+state.period) + 1, s0), e]; }
+function weekStart(d) { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+function buckets(s, e, gran) {
+  const out = [];
+  for (let i = s; i <= e; i++) {
+    const key = gran === 'week' ? weekStart(DAYS[i]).getTime() : i;
+    const last = out[out.length - 1];
+    if (last && last.key === key) last.e = i; else out.push({ key, s: i, e: i, d: gran === 'week' ? weekStart(DAYS[i]) : DAYS[i] });
+  }
+  out.forEach(b => b.label = gran === 'week' ? md(b.d) + '週' : md(b.d));
+  return out;
+}
+const bsum = (a, b) => sumR(a, b.s, b.e), bmean = (a, b) => meanR(a, b.s, b.e);
+
+/* ---------- チャート ---------- */
+function niceTicks(lo, hi, n) {
+  if (hi <= lo) hi = lo + 1;
+  const raw = (hi - lo) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
+  const a = Math.floor(lo / step) * step, b = Math.ceil(hi / step) * step, t = [];
+  for (let v = a; v <= b + step / 2; v += step) t.push(+v.toFixed(6));
+  return t;
+}
+function shortFmt(v, kind) {
+  if (kind === 'yen') return v >= 10000 ? '¥' + (v / 10000).toFixed(v % 10000 ? 1 : 0) + '万' : '¥' + v.toLocaleString('ja-JP');
+  if (kind === 'pct') { const x = v * 100; return (x === 0 ? '0' : x < 1 ? x.toFixed(2) : x < 10 ? x.toFixed(1) : Math.round(x)) + '%'; }
+  return v >= 10000 ? (v / 10000).toFixed(1) + '万' : v.toLocaleString('ja-JP');
+}
+let tipFn = null;
+function showTip(ev, html) {
+  const t = $('#tip'); t.innerHTML = html; t.style.display = 'block';
+  const w = t.offsetWidth, h = t.offsetHeight; let x = ev.clientX + 16, y = ev.clientY + 14;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - 16; if (y + h > innerHeight - 8) y = innerHeight - h - 8;
+  t.style.left = x + 'px'; t.style.top = y + 'px';
+}
+const hideTip = () => { $('#tip').style.display = 'none'; };
+
+function chart(host, o) {
+  const W = Math.max(o.minW || 320, host.clientWidth), H = o.h || 140, L = o.bare ? 2 : 56, R = o.bare ? 2 : 16, T = o.bare ? 2 : o.events ? 22 : 10, B = o.bare ? 2 : o.xaxis === false ? 6 : 22;
+  const iw = W - L - R, ih = H - T - B, bs = o.buckets, n = bs.length, band = iw / Math.max(n, 1);
+  let vals = []; o.series.forEach(s => { if (s.noScale) return; s.values.forEach(v => { if (v != null && isFinite(v)) vals.push(v); }); });
+  if (!vals.length) { host.innerHTML = `<div class="foot" style="padding:${o.bare ? 0 : 10}px 0">${o.bare ? '—' : 'この期間はデータがありません'}</div>`; const stub = { setHover() {} }; if (o.group) o.group.push(stub); return stub; }
+  (o.refs || []).forEach(r => vals.push(r.v));
+  let lo = o.zero === false && vals.length ? Math.min(...vals) : 0, hi = vals.length ? Math.max(...vals) : 1;
+  if (o.zero === false) { const pad = (hi - lo) * 0.15 || hi * 0.1; lo = Math.max(0, lo - pad); hi = hi + pad; }
+  const ticks = niceTicks(lo, hi, o.ticks || 3), y0 = ticks[0], y1 = ticks[ticks.length - 1];
+  const Y = v => T + ih - (v - y0) / (y1 - y0) * ih, X = i => L + band * (i + .5);
+  let g = '';
+  if (!o.bare) ticks.forEach(t => { g += `<line x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--grid)" stroke-width="1"/>`;
+    g += `<text x="${L - 8}" y="${Y(t) + 3.5}" text-anchor="end" font-size="10.5" fill="var(--muted)" class="num">${shortFmt(t, o.kind)}</text>`; });
+  if (o.xaxis !== false && !o.bare) {
+    const step = Math.max(1, Math.ceil(n / (W > 900 ? 12 : 7)));
+    bs.forEach((b, i) => { if (i % step === 0) g += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle" font-size="10.5" fill="var(--muted)">${b.label}</text>`; });
+  }
+  (o.refs || []).forEach(r => { g += `<line x1="${L}" x2="${W - R}" y1="${Y(r.v)}" y2="${Y(r.v)}" stroke="var(--muted)" stroke-dasharray="4 4" stroke-width="1"/>`;
+    g += `<text x="${W - R}" y="${Y(r.v) - 4}" text-anchor="end" font-size="10.5" fill="var(--muted)">${r.label}</text>`; });
+  o.series.forEach((s, si) => {
+    if (s.type === 'bar') {
+      const bw = Math.max(1.5, Math.min(22, band * .66)), off = o.series.filter(x => x.type === 'bar').length > 1 ? (si === 0 ? -bw / 4 : bw / 4) : 0;
+      s.values.forEach((v, i) => { if (v == null || v <= 0) return; const y = Y(v), h = Y(y0) - y;
+        g += `<rect x="${X(i) - bw / 2 + off}" y="${y}" width="${bw}" height="${Math.max(h, .5)}" rx="${Math.min(2, bw / 3)}" fill="${s.color}"/>`; });
+    } else if (s.type === 'line' || s.type === 'step') {
+      let d = '', prev = null;
+      s.values.forEach((v, i) => {
+        if (v == null || !isFinite(v)) { prev = null; return; }
+        if (s.type === 'step') { const x0 = L + band * i, x1 = x0 + band; d += (prev == null ? `M${x0},${Y(v)}` : `L${x0},${Y(v)}`) + `L${x1},${Y(v)}`; }
+        else d += (prev == null ? 'M' : 'L') + X(i) + ',' + Y(v);
+        prev = v;
+      });
+      if (s.area && d) {
+        let a = '', open = false, first = 0, lastX = 0;
+        s.values.forEach((v, i) => { if (v == null) { if (open) { a += `L${lastX},${Y(y0)}L${first},${Y(y0)}Z`; open = false; } return; }
+          if (!open) { first = X(i); a += `M${X(i)},${Y(y0)}L${X(i)},${Y(v)}`; open = true; } else a += `L${X(i)},${Y(v)}`; lastX = X(i); });
+        if (open) a += `L${lastX},${Y(y0)}L${first},${Y(y0)}Z`;
+        g += `<path d="${a}" fill="${s.color}" fill-opacity=".10" stroke="none"/>`;
+      }
+      g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" ${s.dash ? 'stroke-dasharray="5 4"' : ''}/>`;
+    } else if (s.type === 'dots') {
+      s.values.forEach((v, i) => { if (v == null || !isFinite(v)) return; g += `<circle cx="${X(i)}" cy="${Y(Math.min(v, y1))}" r="2.6" fill="${s.color}" fill-opacity=".35"/>`; });
+    }
+  });
+  (o.events || []).forEach(ev => {
+    const x = X(ev.i), y = T - 11;
+    if (ev.kind === 'down') g += `<path d="M${x - 5},${y - 4}L${x + 5},${y - 4}L${x},${y + 4}Z" fill="var(--s2)"/>`;
+    else if (ev.kind === 'up') g += `<path d="M${x - 5},${y + 4}L${x + 5},${y + 4}L${x},${y - 4}Z" fill="var(--ink2)"/>`;
+    else if (ev.kind === 'rank') g += `<circle cx="${x}" cy="${y}" r="${Math.min(6, 2.2 + Math.sqrt(ev.v) / 3)}" fill="var(--s7)" fill-opacity=".8" stroke="var(--panel)" stroke-width="1.5"/>`;
+    else if (ev.kind === 'prem') g += `<rect x="${x - 3.5}" y="${y - 3.5}" width="7" height="7" fill="var(--s1)" stroke="var(--panel)" stroke-width="1.5"/>`;
+  });
+  const hov = o.series.map((s, k) => `<circle id="hv${o.id}_${k}" r="4" fill="${s.color}" stroke="var(--panel)" stroke-width="2" style="display:none"/>`).join('');
+  host.innerHTML = `<svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${o.aria || ''}">${g}
+    <line id="cx${o.id}" x1="0" x2="0" y1="${T}" y2="${T + ih}" stroke="var(--ink2)" stroke-opacity=".35" stroke-width="1" style="display:none"/>${hov}
+    <rect x="${L}" y="0" width="${iw}" height="${H}" fill="transparent" class="hit"/></svg>`;
+  const svg = host.querySelector('svg'), hit = host.querySelector('.hit');
+  const api = {
+    setHover(i) {
+      const cx = svg.querySelector('#cx' + o.id);
+      if (i == null || i < 0 || i >= n) { cx.style.display = 'none'; o.series.forEach((s, k) => svg.querySelector(`#hv${o.id}_${k}`).style.display = 'none'); return; }
+      cx.setAttribute('x1', X(i)); cx.setAttribute('x2', X(i)); cx.style.display = '';
+      o.series.forEach((s, k) => { const c = svg.querySelector(`#hv${o.id}_${k}`), v = s.values[i];
+        if (v == null || !isFinite(v) || s.type === 'bar') { c.style.display = 'none'; return; }
+        c.setAttribute('cx', X(i)); c.setAttribute('cy', Y(Math.min(v, y1))); c.style.display = ''; });
+    }
+  };
+  const idxAt = ev => { const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width; return Math.max(0, Math.min(n - 1, Math.floor((px - L) / band))); };
+  hit.addEventListener('mousemove', ev => { const i = idxAt(ev); (o.group || [api]).forEach(c => c.setHover(i)); if (tipFn) showTip(ev, tipFn(i)); });
+  hit.addEventListener('mouseleave', () => { (o.group || [api]).forEach(c => c.setHover(null)); hideTip(); });
+  if (o.onClick) { hit.style.cursor = 'pointer'; hit.addEventListener('click', ev => o.onClick(idxAt(ev))); }
+  if (o.group) o.group.push(api);
+  return api;
+}
+let CID = 0;
+function legend(items) { return `<div class="legend">${items.map(([c, l, shape]) => `<span><i style="background:${c};${shape === 'circle' ? 'border-radius:50%' : ''}"></i>${l}</span>`).join('')}</div>`; }
+
+/* ---------- 指標の計算 ---------- */
+function priceEvents(pr, s, e) {
+  const ev = []; let prev = null;
+  for (let i = 0; i <= e; i++) { const v = pr.price[i]; if (v == null) continue;
+    if (prev != null && Math.abs(v - prev.v) / prev.v >= 0.05 && i >= s) ev.push({ i, from: prev.v, to: v, kind: v < prev.v ? 'down' : 'up' });
+    prev = { v, i }; }
+  return ev;
+}
+function skuStats(pr, s, e) {
+  const ke = Math.min(e, SKU_END), rows = pr.skus.map(k => {
+    const u14 = sumZ(k.units, SKU_END - 13, SKU_END), wk = u14 / 2;
+    return { k, stock: k.stock, units: sumZ(k.units, s, ke), fav: sumZ(k.fav, s, ke), u7: sumZ(k.units, SKU_END - 6, SKU_END), up7: sumZ(k.units, SKU_END - 13, SKU_END - 7),
+      f7: sumZ(k.fav, SKU_END - 6, SKU_END), fp7: sumZ(k.fav, SKU_END - 13, SKU_END - 7), weekly: wk, weeks: wk > 0 ? k.stock / wk : null };
+  });
+  const tu = rows.reduce((a, r) => a + r.units, 0), tf = rows.reduce((a, r) => a + r.fav, 0), ts = rows.reduce((a, r) => a + r.stock, 0);
+  rows.forEach(r => { r.su = tu ? r.units / tu : 0; r.sf = tf ? r.fav / tf : 0; r.ss = ts ? r.stock / ts : 0;
+    r.status = r.stock === 0 ? ['crit', '欠品'] : r.weeks == null ? ['mute', '売れなし'] : r.weeks < 3 ? ['crit', '切れそう'] : r.weeks < 6 ? ['warn', '注意'] : ['good', '余裕']; });
+  rows.sort((a, b) => b.units - a.units || b.fav - a.fav);
+  return { rows, tu, tf, ts };
+}
+const skuName = k => (k.color || '') + (k.size ? ' / ' + k.size : '');
+const RATES = [
+  { k: 'cvr', l: 'CVR', def: '購入者 ÷ UU', n: 'buyers', d: 'uu', dg: 2 },
+  { k: 'cart', l: 'カート率', def: 'カート投入 ÷ UU', n: 'cart', d: 'uu', dg: 1 },
+  { k: 'favpv', l: 'お気に入り率', def: 'お気に入り ÷ PV', n: 'fav', d: 'pv', dg: 1 },
+  { k: 'f2b', l: 'お気→購入率', def: '購入者 ÷ お気に入り', n: 'buyers', d: 'fav', dg: 1 },
+  { k: 'ctr', l: '広告クリック率', def: 'クリック ÷ 表示回数', n: 'ad.click', d: 'ad.imp', dg: 2 },
+  { k: 'roas', l: 'ROAS', def: '広告経由の売上 ÷ 広告費', n: 'ad.rev', d: 'ad.cost', dg: 0 }];
+const isAdRate = r => r.k === 'ctr' || r.k === 'roas';
+/* 基準（2026-10-04 決定）: PVは週1000以上（3000以上=主力）／お気に入り率(PV比) 6%以上=良い・4〜6%=標準・3〜4%=やや弱い／CVR 1.5%以上=良い・1.0〜1.5%=基準未満・1.0%未満=低い */
+const CRIT = {
+  favpv: v => v == null ? null : v >= .06 ? ['g', '良い'] : v >= .04 ? ['y', '標準'] : v >= .03 ? ['r', 'やや弱い'] : ['r', '弱い'],
+  cvr: v => v == null ? null : v >= .015 ? ['g', '良い'] : v >= .010 ? ['y', '基準未満'] : ['r', '低い'],
+  pvw: v => v == null ? null : v >= 1000 ? ['g', '週1000以上'] : ['r', '週1000未満'] };
+const CRIT_NOTE = { favpv: '基準 6%以上=良い・4〜6%=標準・3〜4%=やや弱い', cvr: '基準 1.5%以上=良い・1.0〜1.5%=基準未満・1.0%未満=低い' };
+const CRIT_REFS = { favpv: [{ v: .06, label: '6%' }, { v: .04, label: '4%' }, { v: .03, label: '3%' }], cvr: [{ v: .015, label: '1.5%' }, { v: .010, label: '1.0%' }] };
+const band = (k, v) => { const b = CRIT[k] && CRIT[k](v); return b ? `<span class="band ${b[0]}">${b[1]}</span>` : ''; };
+const AR = (src, key) => key.startsWith('ad.') ? ((src.ad || {})[key.slice(3)] || []) : (src[key] || []);
+function rateR(src, r, s, e) { if (!src) return null; const a = sumR(AR(src, r.n), s, e), b = sumR(AR(src, r.d), s, e); return a != null && b ? a / b : null; }
+const BR = pr => (D.brand || {})[pr.brand] || null;
+const ptDiff = (a, b) => a == null || b == null ? null : (a - b) * 100;
+const sw = c => `<span class="sw" style="background:${SWATCH[c] || 'var(--muted)'}"></span>`;
+function delta(cur, prev, invert) {
+  if (prev == null || prev === 0 || cur == null) return `<span class="d flat">前7日 —</span>`;
+  const r = cur / prev - 1, cls = Math.abs(r) < .03 ? 'flat' : ((r > 0) !== !!invert ? 'up' : 'down');
+  return `<span class="d ${cls} num">前7日比 ${r > 0 ? '+' : ''}${Math.round(r * 100)}%</span>`;
+}
+
+/* ---------- ヘッダー類 ---------- */
+function renderChrome() {
+  const a = D.asof;
+  $('#asof').textContent = `データ：商品別実績 ${a['商品別実績'].slice(5).replace('-', '/')}まで・売れ/お気に入り ${a['売上集計'].slice(5).replace('-', '/')}まで・広告 ${a['広告'].slice(5).replace('-', '/')}まで・ランキング ${a['ランキング'].slice(5).replace('-', '/')}まで・在庫 ${a['在庫'].replace('売上推移表', '推移表').replace('.xlsx', '')}`;
+  if (EMBED) $('#picker').hidden = true;
+  else {
+    $('#picker').innerHTML = `<button class="navbtn" id="prevP" aria-label="前の品番">◀</button><select id="pSel" aria-label="品番" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);max-width:min(520px,100%)">${KEYS.map(k => `<option value="${k}" ${k === state.p ? 'selected' : ''}>${k}・${P[k].brand}・${P[k].name.replace(/【.*?】|《.*?》/g, '').slice(0, 30)}</option>`).join('')}</select><button class="navbtn" id="nextP" aria-label="次の品番">▶</button>`;
+    $('#pSel').onchange = e => go(e.target.value);
+    $('#prevP').onclick = () => step(-1); $('#nextP').onclick = () => step(1);
+  }
+  const pr = P[state.p], li = lastIdx(pr.price), cur = li >= 0 ? pr.price[li] : null, off = cur && pr.proper ? 1 - cur / pr.proper : null;
+  $('#phead').innerHTML = `<div><h1>${pr.name}</h1><div class="chips"><span class="chip strong">${pr.brand}</span><span class="chip num">${state.p}</span><span class="chip">SKU ${pr.skus.length}</span>
+      <span class="chip num">在庫 ${num(pr.skus.reduce((a, k) => a + k.stock, 0))}</span>${evalChip(state.p)}</div></div>
+    <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
+      <div><div class="foot">直近の売れ値（税抜・${li >= 0 ? md(DAYS[li]) : '—'}）</div><div class="pricebox num"><span class="big">${yen(cur)}</span>${pr.proper ? `<span class="was">${yen(pr.proper)}</span>` : ''}${off != null && off > .01 ? `<span class="off">${Math.round(off * 100)}%OFF</span>` : ''}</div></div>
+      ${pr.url ? `<a class="link" href="${pr.url}" target="_blank" rel="noopener">ZOZOで見る ↗</a>` : ''}</div>`;
+  if ($('#evChip')) $('#evChip').onclick = () => { state.tab = 'overview'; renderAll(); };
+  $('#tabs').innerHTML = TABS.map(([k, l, s]) => `<button class="tab" role="tab" aria-selected="${k === state.tab}" data-t="${k}">${l}<small>${s}</small></button>`).join('');
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => { state.tab = b.dataset.t; renderAll(); });
+  $('#segPeriod').innerHTML = [['30', '30日'], ['60', '60日'], ['all', '全期間']].map(([k, l]) => `<button aria-pressed="${state.period === k}" data-v="${k}">${l}</button>`).join('');
+  document.querySelectorAll('#segPeriod button').forEach(b => b.onclick = () => { state.period = b.dataset.v; renderAll(); });
+  const granOff = state.tab === 'overview' || state.tab === 'sku';
+  $('#segGran').innerHTML = [['day', '日'], ['week', '週']].map(([k, l]) => `<button aria-pressed="${state.gran === k}" data-v="${k}" ${granOff ? 'disabled title="日次・広告タブで使えます"' : ''}>${l}</button>`).join('');
+  document.querySelectorAll('#segGran button').forEach(b => b.onclick = () => { state.gran = b.dataset.v; renderAll(); });
+}
+
+/* ---------- 評価（本番ダッシュボードの自動診断をそのまま移植） ---------- */
+const EV = D.ev || null;
+const EVP = EV ? EV.peers.map(([sc, c, uu, fav, cart, buy, pv]) => ({ sc, c, tot: { uu, fav, cart, buy, pv } })) : [];
+function evSdiv(a,b){return b>0?a/b:null;}
+function evPctl(arr,v){if(!arr||!arr.length)return null;let c=0;for(const x of arr)if(x<=v)c++;return c/arr.length;}
+function evPeers(p){
+  let g=EVP.filter(x=>x.sc===p.sc), scope='子:'+(p.sc||'—');
+  if(g.length<8){g=EVP.filter(x=>x.c===p.c); scope='親:'+(p.c||'—');}
+  if(g.length<8){g=EVP; scope='全体';}
+  return {g,scope};
+}
+const _evBench={};
+function evBenchFor(p){
+  const key=(p.sc||'')+'|'+(p.c||'');
+  if(_evBench[key])return _evBench[key];
+  const {g,scope}=evPeers(p);
+  const pr=(nk,dk)=>{let n=0,d=0;for(const q of g){const T=q.tot||{};n+=(T[nk]||0);d+=(T[dk]||0);}return d>0?n/d*100:null;};
+  const uuArr=g.map(x=>(x.tot&&x.tot.uu)||0).filter(x=>x>0).sort((a,b)=>a-b);
+  const b={scope,n:g.length,favrate:pr('fav','uu'),favrate_pv:pr('fav','pv'),cartrate:pr('cart','uu'),
+    cvr:pr('buy','uu'),fav2buy:pr('buy','fav'),uuArr};
+  _evBench[key]=b;return b;
+}
+function evAnalyze(p,b){
+  const tot=p.tot||{}, marks={}, det={}, L=p.units.length-1;
+  const mk=(r,g0,o0,d0)=>r>=g0?'◎':r>=o0?'○':r>=d0?'△':'✕';
+  const expo=evPctl(b.uuArr,tot.uu||0);
+  if(expo!=null){marks['露出']=expo>=0.70?'◎':expo>=0.45?'○':expo>=0.25?'△':'✕';det['露出']='上位'+Math.max(1,Math.round((1-expo)*100))+'%';}
+  const pFav=evSdiv(tot.fav,tot.pv); const pFavp=pFav!=null?pFav*100:null;
+  if(b.favrate_pv!=null&&pFavp!=null){marks['興味']=mk(pFavp/b.favrate_pv,1.15,0.90,0.70);det['興味']=pFavp.toFixed(1)+'%/基準'+b.favrate_pv.toFixed(1)+'%';}
+  const pCart=evSdiv(tot.cart,tot.uu); const pCartp=pCart!=null?pCart*100:null;
+  if(b.cartrate!=null&&pCartp!=null){marks['カート']=mk(pCartp/b.cartrate,1.10,0.85,0.60);det['カート']=pCartp.toFixed(1)+'%/基準'+b.cartrate.toFixed(1)+'%';}
+  const pCVR=evSdiv(tot.buy,tot.uu); const pCVRp=pCVR!=null?pCVR*100:null;
+  const pF2=evSdiv(tot.buy,tot.fav); const pF2p=pF2!=null?pF2*100:null;
+  let saveStuck=false;
+  if(b.cvr!=null&&pCVRp!=null){marks['転換']=mk(pCVRp/b.cvr,1.10,0.85,0.60);det['転換']=pCVRp.toFixed(2)+'%/基準'+b.cvr.toFixed(2)+'%';
+    if(b.fav2buy!=null&&pF2p!=null&&pF2p<b.fav2buy*0.55)saveStuck=true;}
+  const ipr=(p.units[L]||0)?(p.amt[L]||0)/p.units[L]:0;
+  const saleDep=p.baika>0&&ipr>0&&ipr<p.baika*0.85;
+  const so=p.so||[]; const nw=p.nweeks||so.length||1; const win=Math.min(nw,12);
+  const soRate=so.length?so.slice(-Math.max(1,win)).filter(Boolean).length/Math.min(Math.max(1,win),so.length):0;
+  const cover=p.cover, hasCover=(cover!==''&&cover!=null);
+  const demand=(tot.units||0)>=50;
+  const rec4=p.buy.slice(-4).reduce((a,x)=>a+x,0);
+  let stockState='ok';
+  if(hasCover&&cover>=180)stockState='surplus';
+  else if(hasCover&&cover<28)stockState='shortage';
+  if(stockState!=='surplus'&&soRate>=0.5&&demand)stockState='shortage';
+  if(stockState==='ok'&&soRate===0&&(tot.units||0)>0&&rec4===0&&hasCover&&cover>=180)stockState='surplus';
+  if(stockState==='surplus')marks['在庫']='✕';
+  else if(stockState==='shortage')marks['在庫']=((hasCover&&cover<28)||soRate>=0.5)?'✕':'△';
+  else if(hasCover)marks['在庫']=(soRate===0&&cover>=42&&cover<180)?'◎':(soRate<0.25&&cover>=28)?'○':(cover<42?'△':'○');
+  if(hasCover)det['在庫']=(cover===''?'—':cover+'日');
+  const hasAd=(tot.adcost||0)>0; let adState='na', roasTot=null;
+  if(hasAd){roasTot=evSdiv(tot.adrev,tot.adcost); roasTot=roasTot!=null?roasTot*100:null;
+    if(roasTot!=null){marks['広告']=roasTot>=300?'◎':roasTot>=200?'○':roasTot>=100?'△':'✕';adState=roasTot>=300?'good':roasTot<100?'bad':'ok';det['広告']='ROAS'+Math.round(roasTot)+'%';}}
+  const wu=p.wow_units||0;
+  if((p.units[L]||0)>=5){marks['モメンタム']=(wu>=40&&(p.wow_uu||0)>=0)?'◎':(wu>-15)?'○':(wu>-30)?'△':'✕';
+    if(soRate>=0.5&&marks['モメンタム']==='✕')marks['モメンタム']='○';
+    det['モメンタム']='前週比'+(wu>=0?'+':'')+wu+'%';}
+  return {marks,det,stockState,soRate,saveStuck,saleDep,hasAd,adState,pFav,pCVR};
+}
+function evGrade(p,marks,stockState,adState){
+  const thin=p.isnew||(p.nweeks||0)<6||((p.tot&&p.tot.uu)||0)<30;
+  if(thin)return {g:'新規',hold:true,score:null};
+  const SC={'◎':100,'○':75,'△':45,'✕':15};
+  const W={'露出':0.24,'興味':0.20,'カート':0.10,'転換':0.24,'モメンタム':0.12};
+  let num=0,den=0,firstBroken=null;
+  for(const k of ['露出','興味','カート','転換','モメンタム']){const m=marks[k];if(m==null||SC[m]==null)continue;
+    num+=SC[m]*W[k];den+=W[k];if(firstBroken===null&&(m==='△'||m==='✕'))firstBroken=k;}
+  let base=den>0?num/den:50;
+  const uT=(p.tot&&p.tot.units)||0; base+=uT>=2000?8:uT>=500?4:uT<50?-8:0;
+  if(firstBroken&&['露出','興味','転換'].includes(firstBroken)&&marks[firstBroken]==='✕')base-=12;
+  if(stockState==='shortage')base=Math.max(base,55);
+  if(adState==='good')base+=5;else if(adState==='bad')base-=8;
+  if(marks['モメンタム']==='◎')base+=3;else if(marks['モメンタム']==='✕')base-=3;
+  base=Math.max(0,Math.min(100,Math.round(base)));
+  return {g:base>=82?'S':base>=68?'A':base>=52?'B':base>=36?'C':'D',score:base,bottleneck:firstBroken};
+}
+function evBottleneck(p,marks,stockState,soRate){
+  if(p.isnew||(p.nweeks||0)<6)return {mode:'判断保留',sev:'low'};
+  const demand=((p.tot&&p.tot.units)||0)>=50, hasCover=(p.cover!==''&&p.cover!=null);
+  if(stockState==='shortage'&&((soRate>=0.5&&demand)||(hasCover&&p.cover<28)))return {mode:'欠品',sev:(hasCover&&p.cover<28)?'high':'mid'};
+  if(stockState==='surplus')return {mode:'余剰',sev:'high'};
+  const order=[['露出','露出不足'],['興味','刺さらない'],['カート','カート離脱'],['転換','転換不足']];
+  for(const[k,m]of order)if(marks[k]==='✕')return {stage:k,mode:m,sev:'high'};
+  for(const[k,m]of order)if(marks[k]==='△')return {stage:k,mode:m,sev:'mid'};
+  if(marks['モメンタム']==='✕')return {mode:'失速',sev:'mid'};
+  if(marks['広告']==='✕')return {mode:'広告非効率',sev:'high'};
+  if(marks['広告']==='△')return {mode:'広告非効率',sev:'mid'};
+  return {mode:'健全',sev:'low'};
+}
+function evStrengths(p,marks,b){
+  const out=[];
+  if(marks['モメンタム']==='◎'&&(p.wow_units||0)>=40)out.push('受注 前週比+'+p.wow_units+'%で急伸中。在庫を切らさず松で仕込みランキング上位を狙う');
+  const expo=evPctl(b.uuArr,(p.tot&&p.tot.uu)||0);
+  if(marks['露出']==='◎'&&expo!=null)out.push('露出が強い（カテゴリ上位'+Math.max(1,Math.round((1-expo)*100))+'%）。掲載/ランキングが効いている、順位維持を');
+  const pFav=evSdiv(p.tot.fav,p.tot.pv);
+  if(marks['興味']==='◎'&&b.favrate_pv&&pFav!=null)out.push('お気に入り率がカテゴリ平均の'+(pFav*100/b.favrate_pv).toFixed(1)+'倍。商品力が強い、露出を足せば伸びしろ大');
+  if(marks['カート']==='◎')out.push('カート率が高く購入意欲が強い。在庫を厚くして取りこぼし防止');
+  const pCVR=evSdiv(p.tot.buy,p.tot.uu);
+  if(marks['転換']==='◎'&&b.cvr&&pCVR!=null)out.push('CVRがカテゴリ平均の'+(pCVR*100/b.cvr).toFixed(1)+'倍。価格・サイズ・レビューが揃い刈り取れている');
+  const rt=(p.tot&&p.tot.adcost)?p.tot.adrev/p.tot.adcost*100:0;
+  if(rt>=300)out.push('広告ROAS'+Math.round(rt)+'%と高効率。予算増額で伸ばせる');
+  if(((p.tot&&p.tot.units)||0)>=2000)out.push('通算'+p.tot.units.toLocaleString()+'枚の主力実績。安定した地力');
+  return out.slice(0,2);
+}
+const EV_COPY={
+'露出不足':{high:'UUがカテゴリ下位1/4で露出が根本課題。ランキング掲載枠（カテゴリ/新着）への露出を最優先し、1枚目サムネを競合上位の構図に差し替え。TS（タイムセール）登録で初速を作りランキングの雪だるまを起こす。',mid:'露出がカテゴリ中位以下。特集・ピックアップ枠への申請とTS登録でセール面回遊への露出を作る。1枚目画像のトンマナを売れ筋競合に寄せてクリック率を底上げ。'},
+'刺さらない':{high:'見られているがお気に入り率がカテゴリ比で大幅に低く第一印象で刺さっていない。1〜3枚目画像を刷新（着用/素材アップ/カラバリ明示）、上代が高いなら発売時クーポンや価格再検討で価格印象を調整、レビュー0なら初回レビュー獲得施策を実施。',mid:'興味段がやや弱い。ディテール訴求カット（袖/丈/透け感）とコーデ提案を追加し着回しを可視化。魅力の高い色をサムネ先頭に。PR/インフルエンサーで使用イメージを供給。'},
+'カート離脱':{high:'お気に入りは付くのにカート投入が弱く、サイズ迷い/在庫欠け/価格ためらいの疑い。サイズ表・実寸・着用スタッフ身長を拡充し欠けサイズを再入荷。お気に入り登録者向けクーポンやTS価格で最後の一押しを用意。',mid:'カート率がカテゴリ基準割れ。人気サイズを厚めに補充しレビューのサイズ感コメントを目立たせる。価格が理由なら期間限定クーポンでハードルを下げる。'},
+'転換不足':{high:'UU・お気に入りは十分だがCVRがカテゴリ比で低く最終購入で失速。レビュー獲得を集中施策化、サイズ欠けは即補充、プロパー比割高ならクーポン→通常価格で値付け適正化、購入者向けリピートクーポンで刈り取る。',mid:'転換がカテゴリ平均以下。値付けを近似競合（Musinsa/NUGU同型）と照合、サイズ/カラー別在庫の欠けをチェック、レビュー・Q&A拡充で購入不安を下げる。'},
+'保存止まり':{high:'お気に入りは多いが購入に転換しない（保存止まり）。再入荷/セール開始の通知を配信し、TS登録＋クーポンで登録者の背中を押す。欠品で待たせているなら予約設定を有効化して需要を確保する。'},
+'欠品':{high:'欠品週が半数以上で機会損失が発生中（需要はある）。人気サイズ/カラーを優先に再入荷発注（松シナリオ）、LT28日を見込み早期手配。入荷まで予約設定を有効化し離脱需要をバックログ確保、在庫復活バナー・再入荷通知で溜まった需要を一気に刈り取る。',mid:'一部週で欠品/サイズ欠けにより頭打ち。欠けサイズのスポット補充とサイズ欠け表示で他サイズへ誘導。カバー28日未満なら要即発注として発注リストに載せる。'},
+'余剰':{high:'在庫カバー日数が過大（180日超）で滞留。段階値下げ（登録者クーポン→TS価格→大型セール）で計画的に消化し、コーデ特集/クロスセルで露出を作る。売れ筋色サイズを先頭に出しキャッシュ化を優先、追加発注は停止。',mid:'在庫がやや余剰気味。特集掲載・まとめ買いクーポン・関連バンドルで回転を上げ、動きが鈍い色サイズから優先値引き。追加発注は当面停止。'},
+'広告非効率':{high:'ZOZOAD ROASが損益分岐（約200%）を割り広告赤字。低ROAS面の入札を停止し、CTRの低いサムネと商品ページ（画像・レビュー）を改善してから再開。予算は高ROAS品番へ振り替える。',mid:'ROASが薄利圏（100〜200%）。入札面別にROASを分解し低い面を停止、CPC高ければ除外KWとサムネ改善でCTR向上。広告経由率が高すぎる場合は自然流入強化を併走。'},
+'失速':{high:'受注が前週比で大幅減の失速（欠品起因を除く）。原因（欠品/ランキング落ち/競合セール/トレンド一巡）を特定し、順位低下ならTS/広告で露出を再点火。トレンド鈍化なら在庫を絞り追加発注は梅で抑制、消化モードへ。',mid:'モメンタム鈍化。次回TS登録を前倒しし、お気に入り登録者へクーポン通知でリエンゲージして需要を再点火。'},
+'急騰':{mid:'勢いが出ている。売れ筋サイズの在庫を厚めに保ちつつ次回TSへ登録し、バズ予兆として発注シナリオを一段引き上げるか検討する。'},
+'セール依存':{mid:'転換はあるがセール価格に依存し薄利。プロパーでの反応をクーポン→通常価格の導線で確認し、粗利率（手数料37%＋広告費＋下代）を踏まえTS依存から脱却できる価格を探る。'}
+};
+const EV_GK = { 'S': 'S', 'A': 'A', 'B': 'B', 'C': 'C', 'D': 'D', '新規': 'N' };
+const EV_MCLS = { '欠品': 'm-so', '余剰': 'm-sur', '広告非効率': 'm-ad', '健全': 'm-ok', '判断保留': 'm-hold' };
+const _evRes = {};
+function evalOf(code) {
+  if (_evRes[code] !== undefined) return _evRes[code];
+  const p = EV && EV.items[code]; if (!p) return (_evRes[code] = null);
+  const b = evBenchFor(p), A = evAnalyze(p, b), G = evGrade(p, A.marks, A.stockState, A.adState);
+  const BN = G.hold ? { mode: '判断保留', sev: 'low' } : evBottleneck(p, A.marks, A.stockState, A.soRate);
+  const ST = G.hold ? [] : evStrengths(p, A.marks, b);
+  let summary;
+  if (G.hold) summary = 'データ蓄積中（発売' + (p.nweeks || 0) + '週・判定保留）';
+  else if (BN.mode === '健全') summary = '全ファネル良好。在庫を切らさず維持';
+  else if (BN.mode === '欠品') summary = '需要はあるが欠品で機会損失（買えなかった＝需要失敗ではない）';
+  else if (BN.mode === '余剰') summary = '売れる力はあるが在庫過多。消化が最優先';
+  else summary = BN.mode + 'がボトルネック';
+  const acts = [], bnKey = (BN.mode === '転換不足' && A.saveStuck) ? '保存止まり' : BN.mode;
+  if (EV_COPY[bnKey]) acts.push(EV_COPY[bnKey][BN.sev === 'high' ? 'high' : 'mid'] || EV_COPY[bnKey].high || EV_COPY[bnKey].mid);
+  if (A.saveStuck && bnKey !== '保存止まり') acts.push(EV_COPY['保存止まり'].high);
+  if (A.stockState === 'surplus' && BN.mode !== '余剰') acts.push(EV_COPY['余剰'].mid);
+  if ((A.marks['広告'] === '✕' || A.marks['広告'] === '△') && BN.mode !== '広告非効率') acts.push(EV_COPY['広告非効率'].mid);
+  if (A.marks['モメンタム'] === '◎' && (p.wow_units || 0) >= 40) acts.push(EV_COPY['急騰'].mid);
+  if (A.saleDep) acts.push(EV_COPY['セール依存'].mid);
+  return (_evRes[code] = { p, b, A, G, BN, ST, summary, acts: acts.slice(0, 3), gk: G.hold ? '新規' : G.g });
+}
+function evalChip(code) {
+  const E = evalOf(code); if (!E) return '';
+  return `<span class="chip evg evg-${EV_GK[E.gk]}" id="evChip" title="評価の詳細は概要タブ">評価 ${E.gk}${E.G.score != null ? '・' + E.G.score + '点' : ''}</span>`;
+}
+function evalCard(code) {
+  const E = evalOf(code); if (!E) return '';
+  const { b, A, G, BN, ST, summary, acts } = E;
+  const CH = [['露出', '露出', 'UU順位'], ['興味', '興味', 'お気に入り率（PV比）'], ['カート', 'カート', 'カート率'], ['転換', '転換', 'CVR（購入÷UU）'],
+              ['在庫', '在庫', 'カバー日数'], ['広告', '広告', 'ROAS'], ['モメンタム', '勢い', '受注 前週比']];
+  const MK = { '◎': 'mk-a', '○': 'mk-b', '△': 'mk-c', '✕': 'mk-d' };
+  const chips = CH.map(([k, lab, metric]) => { const m = A.marks[k], na = m == null, bn = !G.hold && BN.stage === k;
+    return `<div class="evc${na ? ' na' : ''}${bn ? ' bn' : ''}"><span class="evc-l">${lab}</span><span class="evc-m">${metric}</span><span class="evc-v ${na ? 'mk-na' : MK[m]}">${na ? '―' : m}</span><span class="evc-d num">${na ? 'N/A' : (A.det[k] || '')}</span></div>`; }).join('');
+  const fix = (!G.hold && BN.mode !== '健全')
+    ? `<div class="ev-fix ${EV_MCLS[BN.mode] || 'm-bad'}"><b>▍いま直すべき：${BN.mode}</b>${acts.length ? `<p>${acts[0]}</p>` : ''}</div>`
+    : BN.mode === '健全' ? `<div class="ev-fix m-ok"><b>✔ ファネル健全。突出したボトルネックなし</b></div>` : '';
+  const lead = !G.hold && BN.mode !== '健全' && acts.length, more = lead ? acts.slice(1) : acts;
+  return `<div class="panel ev evg-${EV_GK[E.gk]}"><div class="ev-grid">
+    <div>
+      <div class="ev-head"><span class="ev-badge">${E.gk}</span><div><div class="ev-sum">評価：${summary}</div>
+        <div class="ev-meta">${G.hold ? '判定保留' : 'スコア ' + G.score + '/100'}　｜　基準 ${b.scope}（n=${b.n}）　地力=通算・勢い=前週比（${EV.wk_last}週まで）</div></div></div>
+      ${fix}
+      ${more.length ? `<div class="ev-h3">${lead ? 'あわせてやること' : '改善アクション'}</div><ol class="ev-acts">${more.map(a => `<li>${a}</li>`).join('')}</ol>` : ''}
+    </div>
+    <div>
+      <div class="ev-leg">ファネル評価：見た(露出)→気に入った(興味)→カート→買った(転換)。<b class="mk-a">◎</b>優 <b class="mk-b">○</b>良 <b class="mk-c">△</b>注意 <b class="mk-d">✕</b>課題（この品番の通算 vs 同カテゴリ平均）</div>
+      <div class="ev-chips">${chips}</div>
+      ${ST.length ? `<div class="ev-str">${ST.map(t => `<span>💪 ${t}</span>`).join('')}</div>` : ''}
+    </div></div>
+    <div class="ev-note">※ ベンチはカテゴリ横断プールレート（Σ分子/Σ分母・通算）。露出はカテゴリ内UUパーセンタイル順位。単週の率は分母が小さく暴れるため地力は通算で評価。欠品週が半数以上は「買えなかった」として転換低下を減点対象外。${A.saleDep ? '　｜　転換はセール価格に依存（薄利）の可能性。' : ''}${b.scope === '全体' ? '　｜　カテゴリ標本が少なく全体基準を使用。' : ''}　｜　評価は週次の集計（${EV.wk_last}週まで）。上の「直近7日」とは期間が違います。</div>
+  </div>`;
+}
+
+/* ---------- 概要 ---------- */
+function renderOverview(v) {
+  const pr = P[state.p], [s, e] = range(), pe = lastIdx(pr.pv), w = [pe - 6, pe], wp = [pe - 13, pe - 7];
+  const S = (a, r) => sumR(a, r[0], r[1]);
+  const cvr = r => { const b = S(pr.buyers, r), u = S(pr.uu, r); return b != null && u ? b / u : null; };
+  const st = skuStats(pr, s, e), stock = st.ts, wk14 = sumZ(pr.units, pe - 13, pe) / 2;
+  const ae0 = lastIdx(pr.ad.imp), bR = BR(pr);
+  const LF = (D.life || {})[state.p], ALL = state.span === 'all' && !!LF;
+  const getT = (T, key) => key.startsWith('ad.') ? (T.ad || {})[key.slice(3)] : T[key];
+  const rateT = (T, r) => { const a = getT(T, r.n), b = getT(T, r.d); return a != null && b ? a / b : null; };
+  const rateTiles = RATES.map(r => { const end = isAdRate(r) ? ae0 : pe, v7 = end < 0 ? null : rateR(pr, r, end - 6, end);
+    if (ALL) { const v = rateT(LF.tot, r);   // 通算：比べる相手は「直近7日」（通算より良くなっているか）
+      return { r, v, pv: v7, pl: '直近7日', pfx: '', d: ptDiff(v7, v), br: rateT(LF.brand, r), bl: 'ブランド平均' }; }
+    if (end < 0) return { r, v: null, pv: null, pl: '前7日', d: null, br: null, bl: 'ブランド平均' };
+    const prev = rateR(pr, r, end - 13, end - 7);
+    return { r, v: v7, pv: prev, pl: '前7日', pfx: '', d: ptDiff(v7, prev), br: rateR(bR, r, end - 6, end), bl: 'ブランド平均' }; });
+  const rateTile = t => { const d = t.d, vb = ptDiff(t.v, t.br);
+    return `<div class="kpi"><span class="l">${t.r.l}</span><span class="v num">${pct(t.v, t.r.dg)}${band(t.r.k, t.v)}</span>
+      <span class="d num ${d == null || Math.abs(d) < .05 ? 'flat' : d > 0 ? 'up' : 'down'}">${t.pl} ${pct(t.pv, t.r.dg)}${d == null ? '' : `（${t.pfx}${Math.abs(d) < .5 * Math.pow(10, -t.r.dg) ? '±0' : (d > 0 ? '+' : '') + d.toFixed(t.r.dg)}pt）`}</span>
+      <span class="d num ${vb == null ? 'flat' : vb >= 0 ? 'up' : 'down'}">${t.bl} ${pct(t.br, t.r.dg)}${vb == null ? '' : vb >= 0 ? ' を上回る' : ' を下回る'}</span>
+      <span class="def">${t.r.def}${CRIT_NOTE[t.r.k] ? '<br>' + CRIT_NOTE[t.r.k] : ''}</span></div>`; };
+  const tiles = [
+    ['受注点数', num(S(pr.units, w)), delta(S(pr.units, w), S(pr.units, wp))],
+    ['受注額（税抜）', yen(S(pr.amt, w)), delta(S(pr.amt, w), S(pr.amt, wp))],
+    ['PV', num(S(pr.pv, w)) + band('pvw', S(pr.pv, w)), delta(S(pr.pv, w), S(pr.pv, wp))],
+    ['UU', num(S(pr.uu, w)), delta(S(pr.uu, w), S(pr.uu, wp))],
+    ['お気に入り', num(S(pr.fav, w)), delta(S(pr.fav, w), S(pr.fav, wp))],
+    ['在庫（全チャネル）', num(stock), `<span class="d ${wk14 && stock / wk14 < 3 ? 'down' : 'flat'} num">${wk14 ? 'あと約' + (stock / wk14).toFixed(1) + '週' : '直近の売れなし'}</span>`]];
+  const ymd = x => x ? x.replace(/^(\d+)-0?(\d+)-0?(\d+)$/, '$1/$2/$3') : '—';
+  let tilesShow = tiles, headTitle = '直近7日',
+    headSub = `${md(DAYS[pe - 6])}〜${md(DAYS[pe])}（商品別実績）${ae0 >= 0 ? `・広告は${md(DAYS[ae0 - 6])}〜${md(DAYS[ae0])}` : ''}・ブランド平均＝${pr.brand}の全品番を合計して計算`;
+  if (ALL) {
+    const T = LF.tot, wk = LF.days / 7, fl = t => `<span class="d flat num">${t}</span>`;
+    tilesShow = [
+      ['受注点数', num(T.units), fl(`週平均 ${num(T.units / wk, 1)}点`)],
+      ['受注額（税抜）', yen(T.amt), fl(`客単価 ${yen(T.buyers ? T.amt / T.buyers : null)}（受注額 ÷ 購入者）`)],
+      ['PV', num(T.pv), `<span class="d flat num">週平均 ${num(T.pv / wk)}${band('pvw', T.pv / wk)}</span>`],
+      ['UU', num(T.uu), fl(`週平均 ${num(T.uu / wk)}`)],
+      ['お気に入り', num(T.fav), fl(`週平均 ${num(T.fav / wk)}`)],
+      ['カート投入', num(T.cart), fl(`週平均 ${num(T.cart / wk)}`)]];
+    headTitle = '発売から通算';
+    headSub = `${ymd(LF.start)}〜${ymd(LF.end)}（${Math.round(LF.days / 7)}週・商品別実績に初めて出た日から）・広告は${ymd(LF.ad_end)}まで・ブランド平均＝同じ期間の${pr.brand}全品番を合計して計算`
+      + (LF.gap ? `<br><span class="gapnote">※ ${ymd(LF.gap.from)}〜${ymd(LF.gap.to)}（${LF.gap.days}日）売れていない期間があり、前シーズン分も含めた通算です</span>` : '');
+  }
+  const notes = [];
+  st.rows.filter(r => r.status[0] === 'crit' || r.status[0] === 'warn').forEach(r => notes.push([r.status, `${sw(r.k.color)}${skuName(r.k)}：在庫${num(r.stock)}`, r.weeks != null ? `直近2週の売れ 週${num(r.weekly, 1)}点 → あと約${r.weeks.toFixed(1)}週` : 'まだ売れていません']));
+  priceEvents(pr, Math.max(s, pe - 59), pe).slice(-2).forEach(ev => notes.push([ev.kind === 'down' ? ['warn', '値下げ'] : ['info', '値上げ'], `${md(DAYS[ev.i])}：売れ値 ${yen(ev.from)} → ${yen(ev.to)}`, `${Math.round((ev.to / ev.from - 1) * 100)}%`]));
+  const rk = []; for (let i = RANK_END - 6; i <= RANK_END; i++) if (pr.rank[i] != null) rk.push(pr.rank[i]);
+  notes.push([rk.length >= 4 ? ['good', 'ランキング'] : rk.length ? ['info', 'ランキング'] : ['mute', 'ランキング'], rk.length ? `直近7日のうち${rk.length}日掲載` : '直近7日は掲載なし', rk.length ? `ランキング経由PV 最大${Math.max(...rk)}（${md(DAYS[RANK_END])}まで）` : `${md(DAYS[RANK_END])}までのデータ`]);
+  const ae = lastIdx(pr.ad.imp);
+  if (ae >= 0) { const c = sumZ(pr.ad.cost, ae - 6, ae), r = sumZ(pr.ad.rev, ae - 6, ae), ro = c ? r / c : null;
+    notes.push([ro == null ? ['mute', '広告'] : ro >= 2 ? ['good', '広告'] : ro >= 1 ? ['warn', '広告'] : ['crit', '広告'], `直近7日のROAS ${pct(ro, 0)}`, `広告費 ${yen(c)} → 経由売上 ${yen(r)}（${md(DAYS[ae])}まで）`]); }
+  else notes.push([['mute', '広告'], '広告は出ていません', '']);
+  const f7 = st.rows.reduce((a, r) => a + r.f7, 0), fp = st.rows.reduce((a, r) => a + r.fp7, 0);
+  if (fp) notes.push([f7 >= fp * 1.15 ? ['good', 'お気に入り'] : f7 <= fp * .85 ? ['warn', 'お気に入り'] : ['mute', 'お気に入り'], `直近7日 ${num(f7)}件（前7日 ${num(fp)}件）`, `${md(DAYS[SKU_END])}まで・SKU合計`]);
+  v.innerHTML = `
+    <div class="blockhead"><div class="bh-l"><h2>${headTitle}</h2><div class="seg sm" id="segSpan">${[['7d', '直近7日'], ['all', '発売から通算']].map(([k, l]) => `<button aria-pressed="${(ALL ? 'all' : '7d') === k}" data-v="${k}">${l}</button>`).join('')}</div></div><span class="sub" style="text-align:right">${headSub}</span></div>
+    <div class="kpis small">${tilesShow.map(([l, val, d]) => `<div class="kpi"><span class="l">${l}${ALL ? '・通算' : l.startsWith('在庫') ? '' : '・直近7日'}</span><span class="v num">${val}</span>${d}</div>`).join('')}</div>
+    <div class="kpis rates">${rateTiles.map(rateTile).join('')}</div>
+    ${evalCard(state.p)}
+    <div class="grid g-side">
+      <div class="grid">
+        <div class="panel"><div class="ph"><h2>受注点数（週別）</h2><span class="sub">期間 ${md(DAYS[s])}〜${md(DAYS[pe])}・月曜始まり・最後の週は${md(DAYS[pe])}までの途中</span></div><div class="chart" id="ovU"></div></div>
+        <div class="panel"><div class="ph"><h2>お気に入り登録（週別）</h2><span class="sub">商品別実績・日別は「日次」タブで</span></div><div class="chart" id="ovF"></div></div>
+        <div class="panel"><div class="ph"><h2>ROAS（週別）</h2><span class="sub">広告経由の売上 ÷ 広告費・広告は${md(DAYS[ae0 >= 0 ? ae0 : N - 1])}まで</span></div>${legend([['var(--s1)', 'この品番'], ['var(--muted)', 'ブランド平均']])}<div class="chart" id="ovR"></div></div>
+      </div>
+      <div class="grid" style="align-content:start">
+        <div class="panel"><div class="ph"><h2>気づき</h2><span class="sub">自動で抽出</span></div><ul class="notes">${notes.map(([p, t, sub]) => `<li><span class="pill ${p[0]}">${p[1]}</span><span class="t">${t}${sub ? `<small>${sub}</small>` : ''}</span></li>`).join('')}</ul></div>
+        <div class="panel"><div class="ph"><h2>SKU</h2><button class="link" id="toSku" style="padding:3px 10px;font-size:12px">SKUタブで詳しく →</button></div>
+          <table><thead><tr><th class="l">カラー</th><th>在庫</th><th>7日の売れ</th><th>あと</th></tr></thead><tbody>
+          ${st.rows.map((r, j) => `<tr class="click" data-k="${pr.skus.indexOf(r.k)}"><td class="l">${sw(r.k.color)}${skuName(r.k)}</td><td>${num(r.stock)}</td><td>${num(r.u7)}</td><td><span class="pill ${r.status[0]}">${r.weeks != null ? r.weeks.toFixed(1) + '週' : r.status[1]}</span></td></tr>`).join('')}
+          </tbody></table></div>
+      </div>
+    </div>`;
+  const bs = buckets(s, pe, 'week'), grp = [];
+  tipFn = i => dayTip(pr, bs[i]).replace('<div class="foot" style="margin-top:4px">クリックで詳細</div>', '');
+  chart($('#ovU'), { id: ++CID, buckets: bs, h: 170, series: [{ label: '受注点数', type: 'bar', color: 'var(--s1)', values: bs.map(b => bsum(pr.units, b)) }], group: grp, aria: '受注点数の週別推移' });
+  chart($('#ovF'), { id: ++CID, buckets: bs, h: 130, series: [{ label: 'お気に入り', type: 'bar', color: 'var(--s3)', values: bs.map(b => bsum(pr.fav, b)) }], group: grp, aria: 'お気に入りの週別推移' });
+  const RO = RATES.find(r => r.k === 'roas'), bsA = buckets(s, ae0 >= 0 ? ae0 : N - 1, 'week');
+  chart($('#ovR'), { id: ++CID, buckets: bsA, h: 140, kind: 'pct', refs: [{ v: 1, label: '100%' }], aria: 'ROASの週別推移',
+    series: [{ type: 'line', color: 'var(--s1)', values: bsA.map(b => rateR(pr, RO, b.s, b.e)) }, { type: 'line', color: 'var(--muted)', dash: true, values: bsA.map(b => rateR(bR, RO, b.s, b.e)) }] });
+  document.querySelectorAll('tr[data-k]').forEach(t => t.onclick = () => openSku(+t.dataset.k));
+  document.querySelectorAll('#segSpan button').forEach(b => b.onclick = () => { state.span = b.dataset.v; renderAll(); });
+  $('#toSku').onclick = () => { state.tab = 'sku'; renderAll(); };
+}
+
+/* ---------- ツールチップ ---------- */
+function dayTip(pr, b) {
+  const one = b.s === b.e, h = one ? mdw(DAYS[b.s]) : `${md(DAYS[b.s])}〜${md(DAYS[b.e])}`;
+  const c = bsum(pr.ad.cost, b), r = bsum(pr.ad.rev, b), rk = bsum(pr.rank, b), pr_ = bmean(pr.price, b);
+  const row = (col, l, v) => `<div class="r"><span>${col ? `<i style="background:${col}"></i>` : ''}${l}</span><span>${v}</span></div>`;
+  return `<h4>${h}</h4>` + row('var(--s1)', '受注点数', num(bsum(pr.units, b))) + row('', '受注額', yen(bsum(pr.amt, b))) + row('var(--s3)', 'お気に入り', num(bsum(pr.fav, b))) +
+    row('var(--s7)', 'PV', num(bsum(pr.pv, b))) + row('', '売れ値（税抜）', yen(pr_)) + row('var(--s2)', '広告費', yen(c)) + row('', 'ROAS', c ? pct(r / c, 0) : '—') +
+    (rk != null ? row('', 'ランキング経由PV', num(rk)) : '') + `<div class="foot" style="margin-top:4px">クリックで詳細</div>`;
+}
+
+function rateTip(pr, b, wk) {
+  const bR = BR(pr), h = wk ? b.label : mdw(b.d);
+  const rows = RATES.map(r => `<tr><td>${r.l}</td><td>${pct(rateR(pr, r, b.s, b.e), r.dg)}</td>${wk ? '' : `<td>${pct(rateR(pr, r, b.s - 6, b.e), r.dg)}</td>`}<td>${pct(rateR(bR, r, wk ? b.s : b.s - 6, b.e), r.dg)}</td></tr>`).join('');
+  return `<h4>${h}</h4><table><tr><th></th><th>${wk ? 'この週' : 'その日'}</th>${wk ? '' : '<th>7日平均</th>'}<th>ブランド</th></tr>${rows}</table>
+    <div class="foot" style="margin-top:4px">UU ${num(bsum(pr.uu, b))}・受注 ${num(bsum(pr.units, b))}点${wk ? '' : '・クリックで詳細'}</div>`;
+}
+
+/* ---------- 日次 ---------- */
+function renderDaily(v) {
+  const pr = P[state.p], [s, e] = range(), bs = buckets(s, e, state.gran), wk = state.gran === 'week';
+  const evs = [];
+  priceEvents(pr, s, e).forEach(ev => { const bi = bs.findIndex(b => ev.i >= b.s && ev.i <= b.e); if (bi >= 0) evs.push({ i: bi, kind: ev.kind }); });
+  bs.forEach((b, i) => { const r = bsum(pr.rank, b); if (r != null) evs.push({ i, kind: 'rank', v: wk ? r / 7 : r }); const pm = bsum(pr.prem, b); if (pm) evs.push({ i, kind: 'prem' }); });
+  const rateMode = state.dmode === 'rate', bR = BR(pr);
+  const modeSeg = `<span class="seg" id="dMode"><button aria-pressed="${rateMode}" data-v="rate">率</button><button aria-pressed="${!rateMode}" data-v="count">数</button></span>`;
+  const evLegend = [['var(--s2)', '値下げ（▼）'], ['var(--ink2)', '値上げ（▲）'], ['var(--s7)', 'ランキング掲載（大きさ＝経由PV）', 'circle'], ['var(--s1)', 'プレミア枠に表示']];
+  if (rateMode) {
+    const lg = wk ? [['var(--s1)', 'この品番（週）'], ['var(--muted)', 'ブランド平均（週）']] : [['var(--s1)', 'この品番（7日平均）'], ['var(--s1)', 'その日', 'circle'], ['var(--muted)', 'ブランド平均（7日平均）']];
+    v.innerHTML = `<details class="panel" id="dDet" ${state.tableOpen ? 'open' : ''}><summary>表で見る</summary><div class="tw" id="dTable">${dailyTable(pr, bs, wk)}</div></details>
+    <div class="panel">
+      <div class="ph"><h2>${wk ? '週別' : '日別'}の率</h2>${modeSeg}</div>
+      ${legend(lg)}${legend(evLegend)}
+      <div class="stack">${RATES.map((r, j) => `<div class="row-title"><b>${r.l}</b><span class="num">期間 ${pct(rateR(pr, r, s, e), r.dg)}・ブランド ${pct(rateR(bR, r, s, e), r.dg)}　<span class="code">${r.def}</span></span></div><div class="chart" id="r${j}"></div>`).join('')}</div>
+      <div class="foot" style="margin-top:6px">その日の点は分母が小さいと大きく振れるので、判断は線（7日平均）で。点が上に突き抜けた日はグラフの上端に置いています。</div></div>`;
+    const grp = [];
+    tipFn = i => rateTip(pr, bs[i], wk);
+    RATES.forEach((r, j) => {
+      const own = bs.map(b => rateR(pr, r, b.s, b.e)), roll = bs.map(b => rateR(pr, r, b.s - 6, b.e)), brand = bs.map(b => rateR(bR, r, wk ? b.s : b.s - 6, b.e));
+      const series = wk ? [{ type: 'line', color: 'var(--s1)', values: own }, { type: 'line', color: 'var(--muted)', dash: true, values: brand }]
+        : [{ type: 'dots', color: 'var(--s1)', values: own, noScale: true }, { type: 'line', color: 'var(--s1)', values: roll }, { type: 'line', color: 'var(--muted)', dash: true, values: brand }];
+      chart($('#r' + j), { buckets: bs, group: grp, onClick: wk ? null : (i => openDay(bs[i].s)), id: ++CID, h: j === 0 ? 132 : 112, kind: 'pct', events: j === 0 ? evs : null, xaxis: j === RATES.length - 1, refs: r.k === 'roas' ? [{ v: 1, label: '100%（広告費と同額）' }] : (CRIT_REFS[r.k] || null), series });
+    });
+    document.querySelectorAll('#dMode button').forEach(b => b.onclick = () => { state.dmode = b.dataset.v; renderAll(); });
+    wireDailyTable(); return;
+  }
+  v.innerHTML = `<details class="panel" id="dDet" ${state.tableOpen ? 'open' : ''}><summary>表で見る</summary><div class="tw" id="dTable">${dailyTable(pr, bs, wk)}</div></details>
+    <div class="panel">
+      <div class="ph"><h2>${wk ? '週別' : '日別'}の動き</h2>${modeSeg}</div>
+      ${legend(evLegend)}
+      <div class="stack">
+        <div class="row-title"><b>受注点数</b><span>期間合計 ${num(sumR(pr.units, s, e))}点・${yen(sumR(pr.amt, s, e))}</span></div><div class="chart" id="d1"></div>
+        <div class="row-title"><b>お気に入り</b><span>期間合計 ${num(sumR(pr.fav, s, e))}</span></div><div class="chart" id="d2"></div>
+        <div class="row-title"><b>PV</b><span>期間合計 ${num(sumR(pr.pv, s, e))}</span></div><div class="chart" id="d3"></div>
+        <div class="row-title"><b>売れ値（税抜・その${wk ? '週の平均' : '日一番多い価格'}）</b><span>点線＝プロパー ${yen(pr.proper)}</span></div><div class="chart" id="d4"></div>
+        <div class="row-title"><b>広告費</b><span>期間合計 ${yen(sumR(pr.ad.cost, s, e))}</span></div><div class="chart" id="d5"></div>
+      </div></div>`;
+  const grp = [], click = i => wk ? null : openDay(bs[i].s);
+  tipFn = i => dayTip(pr, bs[i]);
+  const common = { buckets: bs, group: grp, onClick: wk ? null : click };
+  chart($('#d1'), { ...common, id: ++CID, h: 150, events: evs, xaxis: false, series: [{ type: 'bar', color: 'var(--s1)', values: bs.map(b => bsum(pr.units, b)) }] });
+  chart($('#d2'), { ...common, id: ++CID, h: 96, xaxis: false, series: [{ type: 'bar', color: 'var(--s3)', values: bs.map(b => bsum(pr.fav, b)) }] });
+  chart($('#d3'), { ...common, id: ++CID, h: 96, xaxis: false, series: [{ type: 'line', area: true, color: 'var(--s7)', values: bs.map(b => bsum(pr.pv, b)) }] });
+  chart($('#d4'), { ...common, id: ++CID, h: 96, xaxis: false, kind: 'yen', zero: false, refs: pr.proper ? [{ v: pr.proper, label: 'プロパー' }] : [], series: [{ type: 'step', color: 'var(--ink2)', values: bs.map(b => bmean(pr.price, b)) }] });
+  chart($('#d5'), { ...common, id: ++CID, h: 110, kind: 'yen', series: [{ type: 'bar', color: 'var(--s2)', values: bs.map(b => bsum(pr.ad.cost, b)) }] });
+  document.querySelectorAll('#dMode button').forEach(b => b.onclick = () => { state.dmode = b.dataset.v; renderAll(); });
+  wireDailyTable();
+}
+
+function dailyTable(pr, bs, wk) {
+  const cvr = b => { const u = bsum(pr.uu, b), by = bsum(pr.buyers, b); return u ? pct(by / u, 2) : '—'; };
+  const roas = b => { const c = bsum(pr.ad.cost, b), r = bsum(pr.ad.rev, b); return c ? pct(r / c, 0) : '—'; };
+  const rows = [...RATES.map(r => [r.l, b => pct(rateR(pr, r, b.s, b.e), r.dg), null, CRIT[r.k] ? b => CRIT[r.k](rateR(pr, r, b.s, b.e)) : null]),
+    ['受注点数', b => num(bsum(pr.units, b)), 'sep'], ['受注額', b => yen(bsum(pr.amt, b))], ['お気に入り', b => num(bsum(pr.fav, b))],
+    ['PV', b => num(bsum(pr.pv, b)), null, wk ? b => (b.e - b.s >= 6 ? CRIT.pvw(bsum(pr.pv, b)) : null) : null],   // 途中の週は色を付けない ['UU', b => num(bsum(pr.uu, b))], ['売れ値', b => yen(bmean(pr.price, b))],
+    ['広告費', b => yen(bsum(pr.ad.cost, b))], ['ROAS', roas], ['ランキングPV', b => num(bsum(pr.rank, b))]];
+  const sun = b => !wk && b.d.getDay() === 0 ? ' class="sun"' : '';
+  const head = `<tr><th class="stk">${wk ? '週' : '日付'}</th>${bs.map(b => `<th${sun(b)}>${wk ? b.label : md(b.d)}${wk ? '' : `<small>${DOW[b.d.getDay()]}</small>`}</th>`).join('')}</tr>`;
+  const cls = (b, cf) => { const c = [!wk && b.d.getDay() === 0 ? 'sun' : '']; const x = cf && cf(b); if (x) c.push('bg-' + x[0]); const j = c.filter(Boolean).join(' '); return j ? ` class="${j}"` : ''; };
+  const body = rows.map(([l, f, sep, cf]) => `<tr${sep ? ' class="sep"' : ''}><td class="stk">${l}</td>${bs.map(b => `<td${cls(b, cf)}>${f(b)}</td>`).join('')}</tr>`).join('');
+  return `<table class="tt"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+function wireDailyTable() {
+  const det = $('#dDet'), tw = $('#dTable'); if (!det) return;
+  const toEnd = () => { tw.scrollLeft = tw.scrollWidth; };
+  det.addEventListener('toggle', () => { state.tableOpen = det.open; if (det.open) requestAnimationFrame(toEnd); });
+  if (det.open) requestAnimationFrame(toEnd);
+}
+
+/* ---------- SKU ---------- */
+function renderSku(v) {
+  const pr = P[state.p], [s, e] = range(), st = skuStats(pr, s, Math.min(e, SKU_END)), rows = st.rows;
+  if (!rows.length) { v.innerHTML = '<div class="panel empty">SKUのデータがありません</div>'; return; }
+  const top = rows[0], over = rows.filter(r => r.ss - r.su > .1), short = rows.filter(r => r.su - r.ss > .1);
+  const sent = [`売れの中心は${sw(top.k.color)}<b>${skuName(top.k)}</b>（期間の売れの${Math.round(top.su * 100)}%）。`];
+  if (short.length) sent.push(`<b>${short.map(r => skuName(r.k)).join('・')}</b>は売れの割合に対して在庫が少なめです。`);
+  if (over.length) sent.push(`<b>${over.map(r => skuName(r.k)).join('・')}</b>は在庫の割合が売れより大きく、余りぎみです。`);
+  const bar = (x, col) => `<span class="share"><span class="num">${Math.round(x * 100)}%</span><i><b style="width:${Math.round(x * 100)}%;background:${col}"></b></i></span>`;
+  v.innerHTML = `<div class="panel" style="padding-block:12px"><div class="t">${sent.join(' ')}</div><div class="foot" style="margin-top:4px">期間 ${md(DAYS[s])}〜${md(DAYS[Math.min(e, SKU_END)])}・売れ/お気に入りは${md(DAYS[SKU_END])}まで。「あと」は直近2週の売れペースで今の在庫がもつ週数。</div></div>
+    <div class="panel"><div class="ph"><h2>SKU別</h2><span class="sub">行をクリックで日別の動き</span></div><div class="tw"><table>
+      <thead><tr><th class="l">カラー / サイズ</th><th class="l">SKU番号</th><th>在庫</th><th>期間の売れ</th><th>直近7日</th><th>お気に入り</th><th>売れの割合</th><th>お気に入りの割合</th><th>在庫の割合</th><th>あと</th><th class="l">売れの推移</th></tr></thead>
+      <tbody>${rows.map((r, j) => `<tr class="click" data-k="${pr.skus.indexOf(r.k)}"><td class="l">${sw(r.k.color)}${skuName(r.k)}</td><td class="l code">${r.k.code}</td><td>${num(r.stock)}${r.k.reserved ? `<div class="code">取置 ${num(r.k.reserved)}</div>` : ''}</td>
+        <td>${num(r.units)}</td><td>${num(r.u7)} <span class="${r.u7 > r.up7 ? 'up' : r.u7 < r.up7 ? 'down' : 'flat'}">${r.u7 > r.up7 ? '↑' : r.u7 < r.up7 ? '↓' : '→'}</span></td><td>${num(r.fav)}</td>
+        <td>${bar(r.su, 'var(--s1)')}</td><td>${bar(r.sf, 'var(--s3)')}</td><td>${bar(r.ss, 'var(--ink2)')}</td>
+        <td><span class="pill ${r.status[0]}">${r.weeks != null ? r.weeks.toFixed(1) + '週' : r.status[1]}</span></td><td class="l"><div class="chart spark" id="sp${j}" style="width:150px"></div></td></tr>`).join('')}
+      </tbody></table></div><div class="foot" style="margin-top:8px">売れ・お気に入りはZOZO（本店＋Yahoo店）、在庫は全チャネル（推移表・POP-UP取り置き除外）。在庫の割合と売れの割合の差が10ポイント以上ある色を上の文で指摘しています。</div></div>`;
+  tipFn = null;
+  const bs = buckets(s, Math.min(e, SKU_END), 'day');
+  rows.forEach((r, j) => chart($('#sp' + j), { id: ++CID, buckets: bs, h: 30, bare: true, minW: 140, series: [{ type: 'bar', color: 'var(--s1)', values: bs.map(b => bsum(r.k.units, b)) }] }));
+  document.querySelectorAll('tr[data-k]').forEach(t => t.onclick = () => openSku(+t.dataset.k));
+}
+
+/* ---------- 広告 ---------- */
+function renderAd(v) {
+  const pr = P[state.p], [s, e] = range(), bs = buckets(s, e, state.gran), wk = state.gran === 'week', A = pr.ad;
+  const C = sumR(A.cost, s, e), Rv = sumR(A.rev, s, e), I = sumR(A.imp, s, e), K = sumR(A.click, s, e), Cv = sumR(A.cv, s, e), Pm = sumR(pr.prem, s, e);
+  if (!C) { v.innerHTML = '<div class="panel empty">この期間は広告が出ていません。期間を「全期間」にすると過去の広告も見られます。</div>'; return; }
+  const roll = bs.map((b, i) => { if (wk) { const c = bsum(A.cost, b); return c ? bsum(A.rev, b) / c : null; } const c = sumZ(A.cost, b.s - 6, b.s); return c ? sumZ(A.rev, b.s - 6, b.s) / c : null; });
+  const daily = bs.map(b => { const c = bsum(A.cost, b); return c ? bsum(A.rev, b) / c : null; });
+  const evs = []; bs.forEach((b, i) => { if (bsum(pr.prem, b)) evs.push({ i, kind: 'prem' }); });
+  const tiles = [['広告費', yen(C)], ['広告経由の売上', yen(Rv)], ['ROAS', pct(Rv / C, 0)], ['クリック率', pct(K / I, 2)], ['クリック単価', yen(C / K)], ['経由件数', num(Cv)]];
+  v.innerHTML = `<div class="kpis">${tiles.map(([l, x]) => `<div class="kpi"><span class="l">${l}・期間</span><span class="v num">${x}</span></div>`).join('')}</div>
+    <div class="foot">期間 ${md(DAYS[s])}〜${md(DAYS[e])}${Pm ? `・プレミア枠に${num(Pm)}回表示` : ''}</div>
+    <div class="panel"><div class="ph"><h2>広告費と経由売上</h2><span class="sub">ROASの高い日は2本の差が大きい日です</span></div>${legend([['var(--s2)', '広告費'], ['var(--s1)', '広告経由の売上']])}<div class="chart" id="a1"></div></div>
+    <div class="grid g2">
+      <div class="panel"><div class="ph"><h2>ROAS</h2><span class="sub">${wk ? '週ごと' : '点＝その日、線＝直近7日'}</span></div>${legend(wk ? [['var(--s1)', '週のROAS']] : [['var(--s1)', '直近7日のROAS'], ['var(--s1)', 'その日のROAS', 'circle']])}<div class="chart" id="a2"></div></div>
+      <div class="panel"><div class="ph"><h2>クリック率</h2><span class="sub">■＝プレミア枠に表示</span></div><div class="chart" id="a3"></div></div>
+    </div>`;
+  const grp = [];
+  tipFn = i => { const b = bs[i], c = bsum(A.cost, b), r = bsum(A.rev, b), im = bsum(A.imp, b), k = bsum(A.click, b);
+    const row = (l, x) => `<div class="r"><span>${l}</span><span>${x}</span></div>`;
+    return `<h4>${wk ? b.label : mdw(b.d)}</h4>` + row('表示回数', num(im)) + row('クリック', num(k)) + row('クリック率', im ? pct(k / im, 2) : '—') + row('広告費', yen(c)) + row('経由件数', num(bsum(A.cv, b))) + row('経由売上', yen(r)) + row('ROAS', c ? pct(r / c, 0) : '—') + (wk ? '' : row('直近7日ROAS', pct(roll[i], 0))) + (bsum(pr.prem, b) ? row('プレミア表示', num(bsum(pr.prem, b))) : ''); };
+  const common = { buckets: bs, group: grp, onClick: wk ? null : (i => openDay(bs[i].s)) };
+  chart($('#a1'), { ...common, id: ++CID, h: 180, kind: 'yen', series: [{ type: 'bar', color: 'var(--s2)', values: bs.map(b => bsum(A.cost, b)) }, { type: 'line', color: 'var(--s1)', values: bs.map(b => bsum(A.rev, b)) }] });
+  chart($('#a2'), { ...common, id: ++CID, h: 160, kind: 'pct', refs: [{ v: 1, label: '100%（広告費と同額）' }],
+    series: wk ? [{ type: 'line', color: 'var(--s1)', values: daily }] : [{ type: 'dots', color: 'var(--s1)', values: daily.map(x => x == null ? null : Math.min(x, 8)) }, { type: 'line', color: 'var(--s1)', values: roll }] });
+  chart($('#a3'), { ...common, id: ++CID, h: 160, kind: 'pct', events: evs, series: [{ type: 'line', color: 'var(--s7)', values: bs.map(b => { const im = bsum(A.imp, b); return im ? bsum(A.click, b) / im : null; }) }] });
+}
+
+/* ---------- 引き出し ---------- */
+function openDrawer(title, sub, html, after) {
+  $('#dtitle').textContent = title; $('#dsub').innerHTML = sub; $('#dbody').innerHTML = html;
+  $('#drawer').classList.add('on'); $('#drawer').setAttribute('aria-hidden', 'false'); $('#scrim').classList.add('on'); hideTip();
+  if (after) requestAnimationFrame(after); $('#dclose').focus();
+}
+function closeDrawer() { $('#drawer').classList.remove('on'); $('#drawer').setAttribute('aria-hidden', 'true'); $('#scrim').classList.remove('on'); }
+$('#dclose').onclick = closeDrawer; $('#scrim').onclick = closeDrawer;
+addEventListener('keydown', ev => { if (ev.key === 'Escape') closeDrawer(); });
+function openDay(i) {
+  const pr = P[state.p], A = pr.ad, d = DAYS[i], kv = arr => `<div class="kv">${arr.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('')}</div>`;
+  const c = A.cost[i], r = A.rev[i];
+  const skus = pr.skus.map(k => ({ k, u: k.units[i] || 0, f: k.fav[i] || 0 })).filter(x => x.u || x.f).sort((a, b) => b.u - a.u || b.f - a.f);
+  openDrawer(mdw(d), `${state.p}・${pr.name.replace(/【.*?】|《.*?》/g, '').slice(0, 24)}`, `
+    <div class="dsec"><h4>率（その日／直近7日／ブランド7日）</h4><table><thead><tr><th class="l"></th><th>その日</th><th>7日</th><th>ブランド</th></tr></thead><tbody>${RATES.map(r => `<tr><td class="l">${r.l}</td><td>${pct(rateR(pr, r, i, i), r.dg)}</td><td>${pct(rateR(pr, r, i - 6, i), r.dg)}</td><td>${pct(rateR(BR(pr), r, i - 6, i), r.dg)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="dsec"><h4>お客さんの動き（商品別実績）</h4>${kv([['PV', num(pr.pv[i])], ['UU', num(pr.uu[i])], ['お気に入り', num(pr.fav[i])], ['カート投入', num(pr.cart[i])], ['受注点数', num(pr.units[i])], ['受注額（税抜）', yen(pr.amt[i])], ['購入者', num(pr.buyers[i])], ['CVR', pr.uu[i] ? pct(pr.buyers[i] / pr.uu[i], 2) : '—']])}</div>
+    <div class="dsec"><h4>価格・露出</h4>${kv([['売れ値（税抜）', yen(pr.price[i])], ['プロパー', yen(pr.proper)], ['ランキング経由PV', pr.rank[i] != null ? num(pr.rank[i]) : i > RANK_END ? 'データ未取得' : '掲載なし']])}</div>
+    <div class="dsec"><h4>広告</h4>${A.imp[i] ? kv([['表示回数', num(A.imp[i])], ['クリック', num(A.click[i])], ['クリック率', pct(A.click[i] / A.imp[i], 2)], ['広告費', yen(c)], ['経由件数', num(A.cv[i])], ['経由売上', yen(r)], ['ROAS', c ? pct(r / c, 0) : '—'], ['プレミア表示', num(pr.prem[i] || 0)]]) : '<div class="foot">広告は出ていません</div>'}</div>
+    <div class="dsec"><h4>SKU別（売上集計・お気に入り日次）</h4>${i > SKU_END ? '<div class="foot">この日のSKU別データはまだありません</div>' : skus.length ? `<table><thead><tr><th class="l">カラー</th><th>売れ</th><th>お気に入り</th></tr></thead><tbody>${skus.map(x => `<tr><td class="l">${sw(x.k.color)}${skuName(x.k)}</td><td>${num(x.u)}</td><td>${num(x.f)}</td></tr>`).join('')}</tbody></table>` : '<div class="foot">この日はSKU別の売れ・お気に入りがありません</div>'}</div>`);
+}
+function openSku(j) {
+  const pr = P[state.p], k = pr.skus[j], [s, e] = range(), ke = Math.min(e, SKU_END), st = skuStats(pr, s, ke).rows.find(r => r.k === k), bs = buckets(s, ke, 'week');
+  openDrawer(skuName(k), `${k.code}${k.jan ? '・JAN ' + k.jan : ''}`, `
+    <div class="dsec"><div class="kv">${[['在庫（全チャネル）', num(k.stock)], ['POP-UP取り置き', num(k.reserved)], ['期間の売れ', num(st.units)], ['期間のお気に入り', num(st.fav)], ['直近7日の売れ', num(st.u7) + '（前7日 ' + num(st.up7) + '）'], ['直近7日のお気に入り', num(st.f7) + '（前7日 ' + num(st.fp7) + '）'], ['直近2週の売れペース', '週' + num(st.weekly, 1) + '点'], ['在庫がもつ目安', st.weeks != null ? 'あと約' + st.weeks.toFixed(1) + '週' : '—']].map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('')}</div></div>
+    <div class="dsec"><h4>週別の売れ</h4><div class="chart" id="dsU"></div></div>
+    <div class="dsec"><h4>週別のお気に入り</h4><div class="chart" id="dsF"></div></div>
+    <div class="dsec"><h4>週別</h4><table><thead><tr><th class="l">週</th><th>売れ</th><th>お気に入り</th></tr></thead><tbody>${bs.slice().reverse().map(b => `<tr><td class="l">${b.label}</td><td>${num(bsum(k.units, b))}</td><td>${num(bsum(k.fav, b))}</td></tr>`).join('')}</tbody></table></div>`,
+    () => { const prev = tipFn; tipFn = null;
+      chart($('#dsU'), { id: ++CID, buckets: bs, h: 120, series: [{ type: 'bar', color: 'var(--s1)', values: bs.map(b => bsum(k.units, b)) }] });
+      chart($('#dsF'), { id: ++CID, buckets: bs, h: 120, series: [{ type: 'bar', color: 'var(--s3)', values: bs.map(b => bsum(k.fav, b)) }] });
+      tipFn = prev; });
+}
+
+/* ---------- 全体 ---------- */
+function go(h) { if (!P[h] || h === state.p) return; state.p = h; if (location.hash.slice(1) !== h) history.replaceState(null, '', '#' + h); closeDrawer && closeDrawer(); renderAll(); scrollTo(0, 0); }
+function step(dir) { if (EMBED) parent.postMessage({ type: 'karte-nav', dir }, '*'); else go(KEYS[(KEYS.indexOf(state.p) + dir + KEYS.length) % KEYS.length]); }
+addEventListener('hashchange', () => { const h = hashP(); if (h) go(h); });
+addEventListener('message', e => { const m = e.data || {}; if (m.type === 'karte-open') go(m.h); });
+function renderAll() {
+  renderChrome(); const v = $('#view'); hideTip();
+  v.className = 'grid';
+  ({ overview: renderOverview, daily: renderDaily, sku: renderSku, ad: renderAd })[state.tab](v);
+}
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(renderAll, 150); });
+addEventListener('keydown', ev => { if (ev.target.closest('input,select,textarea') || $('#drawer').classList.contains('on')) return;
+  if (ev.key === 'ArrowRight') step(1);
+  if (ev.key === 'ArrowLeft') step(-1); });
+if (D) renderAll();
+</script>
