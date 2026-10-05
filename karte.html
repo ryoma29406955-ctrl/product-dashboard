@@ -202,6 +202,9 @@ tbody tr.click:hover{background:var(--panel2)}
 .tt th.stk{color:var(--muted)}
 .tt .sun{background:var(--panel2)}
 .tt.heat td{min-width:44px}
+.tt .pl{white-space:nowrap;line-height:1.35}
+.tt .pl small{color:var(--muted);margin-left:2px;font-size:10.5px}
+.tt td{vertical-align:top}
 .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:0}
 .tt tbody tr:hover td{background:var(--accent-soft)}
 /* charts */
@@ -442,6 +445,14 @@ const SKU_SOON = 3, SKU_HEAVY = 12;   // SKUの在庫判定（今の在庫があ
 // 発売日：売上推移表の販売開始日（なければZOZOの商品別実績に初めて出た日）。直近120日以内なら何日目か
 const relChip = pr => { const d = pr.rel || pr.start; if (!d) return ''; const [y, m, dd] = d.split('-').map(Number), n = Math.round((DAYS[N - 1] - new Date(y, m - 1, dd)) / 864e5) + 1;
   return `<span class="chip num" title="${pr.rel ? '販売開始日（売上推移表）' : 'ZOZOの商品別実績に初めて出た日'}${pr.rel && pr.start && pr.start !== pr.rel ? '・ZOZO初出 ' + pr.start.replace(/-/g, '/') : ''}">発売 ${y}/${m}/${dd}${n > 0 && n <= 120 ? `（${n}日目）` : ''}</span>`; };
+// その日（週）に売れた価格。1つならその価格、2つ以上なら「価格×点数」を多い順に全部
+function priceList(pr, b) { const m = new Map(); for (let i = b.s; i <= b.e; i++) ((pr.prices || [])[i] || []).forEach(([p, u]) => m.set(p, (m.get(p) || 0) + u)); return [...m.entries()].sort((a, c) => c[1] - a[1]); }
+function priceCell(pr, b) {
+  if (b.s > SKU_END) return '—';
+  const L = priceList(pr, b); if (!L.length) return '<span class="flat">·</span>';
+  if (L.length === 1) return yen(L[0][0]);
+  return L.map(([p, u]) => `<div class="pl">${yen(p)}<small>×${u}</small></div>`).join('');
+}
 const skuName = k => (k.color || '') + (k.size ? ' / ' + k.size : '');
 const RATES = [
   { k: 'cvr', l: 'CVR', def: '購入者 ÷ UU', n: 'buyers', d: 'uu', dg: 2 },
@@ -921,7 +932,8 @@ function dailyTable(pr, bs, wk) {
   const roas = b => { const c = bsum(pr.ad.cost, b), r = bsum(pr.ad.rev, b); return c ? pct(r / c, 0) : '—'; };
   const rows = [...RATES.map(r => [r.l, b => pct(rateR(pr, r, b.s, b.e), r.dg), null, CRIT[r.k] ? b => CRIT[r.k](rateR(pr, r, b.s, b.e)) : null]),
     ['受注点数', b => num(bsum(pr.units, b)), 'sep'], ['　うち予約', b => b.s > SKU_END ? '—' : num(rsvB(pr, b) || 0)], ['受注額', b => yen(bsum(pr.amt, b))], ['お気に入り', b => num(bsum(pr.fav, b))],
-    ['PV', b => num(bsum(pr.pv, b)), null, wk ? b => (b.e - b.s >= 6 ? CRIT.pvw(bsum(pr.pv, b)) : null) : null],   // 途中の週は色を付けない ['UU', b => num(bsum(pr.uu, b))], ['売れ値', b => yen(bmean(pr.price, b))],
+    ['PV', b => num(bsum(pr.pv, b)), null, wk ? b => (b.e - b.s >= 6 ? CRIT.pvw(bsum(pr.pv, b)) : null) : null],   /* 途中の週は色を付けない */
+    ['UU', b => num(bsum(pr.uu, b))], ['販売価格（税抜）', b => priceCell(pr, b)],
     ['広告の表示回数（imp）', b => num(bsum(pr.ad.imp, b))], ['広告クリック', b => num(bsum(pr.ad.click, b))], ['広告費', b => yen(bsum(pr.ad.cost, b))], ['広告経由の売上', b => yen(bsum(pr.ad.rev, b))], ['ランキングPV', b => num(bsum(pr.rank, b))]];
   const sun = b => !wk && b.d.getDay() === 0 ? ' class="sun"' : '';
   const head = `<tr><th class="stk">${wk ? '週' : '日付'}</th>${bs.map(b => `<th${sun(b)}>${wk ? b.label : md(b.d)}${wk ? '' : `<small>${DOW[b.d.getDay()]}</small>`}</th>`).join('')}</tr>`;
@@ -943,7 +955,7 @@ function skuColors(rows) {
   return rows.map((r, i) => { let c = SWATCH[r.k.color]; if (!c || used.has(c)) c = SKU_PAL.find(x => !used.has(x)) || SKU_PAL[i % SKU_PAL.length]; used.add(c); return c; });
 }
 const isLight = hex => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return false; const n = parseInt(m[1], 16); return (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255 > .82; };
-function skuTrendTable(rows, cols, bs, key, wk) {
+function skuTrendTable(pr, rows, cols, bs, key, wk) {
   const vals = rows.map(r => bs.map(b => bsum(r.k[key], b) || 0)), mx = Math.max(1, ...vals.flat());
   const base = key === 'units' ? 'var(--s1)' : 'var(--s3)';
   const cell = v => `<td style="background:${v ? `color-mix(in srgb, ${base} ${Math.round(12 + v / mx * 58)}%, var(--panel))` : 'transparent'};${v / mx > .55 ? 'color:#fff;' : ''}">${v ? num(v) : '<span class="flat">·</span>'}</td>`;
@@ -951,7 +963,8 @@ function skuTrendTable(rows, cols, bs, key, wk) {
   const sun = b => !wk && b.d.getDay() === 0 ? ' class="sun"' : '';
   return `<table class="tt heat"><thead><tr><th class="stk">${wk ? '週' : '日付'}</th>${bs.map(b => `<th${sun(b)}>${wk ? b.label : md(b.d)}${wk ? '' : `<small>${DOW[b.d.getDay()]}</small>`}</th>`).join('')}<th>合計</th></tr></thead>
     <tbody>${rows.map((r, j) => `<tr><td class="stk"><i class="dot" style="background:${cols[j]}"></i>${skuName(r.k)}</td>${vals[j].map(cell).join('')}<td><b>${num(vals[j].reduce((a, x) => a + x, 0))}</b></td></tr>`).join('')}
-    <tr class="sep"><td class="stk"><b>合計</b></td>${tot.map(v => `<td><b>${num(v)}</b></td>`).join('')}<td><b>${num(tot.reduce((a, x) => a + x, 0))}</b></td></tr></tbody></table>`;
+    <tr class="sep"><td class="stk"><b>合計</b></td>${tot.map(v => `<td><b>${num(v)}</b></td>`).join('')}<td><b>${num(tot.reduce((a, x) => a + x, 0))}</b></td></tr>
+    <tr class="sep"><td class="stk">販売価格（税抜）</td>${bs.map(b => `<td${sun(b)}>${priceCell(pr, b)}</td>`).join('')}<td></td></tr></tbody></table>`;
 }
 function renderSku(v) {
   const pr = P[state.p], [s, e] = range(), st = skuStats(pr, s, Math.min(e, SKU_END)), rows = st.rows;
@@ -990,7 +1003,7 @@ function renderSku(v) {
     tip: i => { const b = tb[i], items = rows.map((r, j) => [cols[j], skuName(r.k), bsum(r.k[key], b) || 0]).filter(x => x[2]).sort((a, c) => c[2] - a[2]);
       return `<h4>${wk ? b.label : mdw(b.d)}</h4>` + (items.length ? items.map(([c, n, v]) => `<div class="r"><span><i style="background:${c}"></i>${n}</span><span>${num(v)}</span></div>`).join('') + `<div class="r"><span><b>合計</b></span><span><b>${num(items.reduce((a, x) => a + x[2], 0))}</b></span></div>` : '<div class="foot">なし</div>'); },
     series: rows.map((r, j) => ({ type: 'bar', stack: true, color: cols[j], stroke: isLight(cols[j]) ? 'var(--muted)' : null, values: tb.map(b => bsum(r.k[key], b) || 0) })) });
-  $('#skuTbl').innerHTML = skuTrendTable(rows, cols, tb, key, wk);
+  $('#skuTbl').innerHTML = skuTrendTable(pr, rows, cols, tb, key, wk);
   requestAnimationFrame(() => { const t = $('#skuTbl'); if (t) t.scrollLeft = t.scrollWidth; });
   $('#skuDet').addEventListener('toggle', () => { state.skuTblOpen = $('#skuDet').open; });
   document.querySelectorAll('#skuMode button').forEach(b => b.onclick = () => { state.skuMode = b.dataset.v; renderAll(); });
