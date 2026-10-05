@@ -144,6 +144,22 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent2);o
 .ev-imp{color:var(--good);font-weight:600}
 .ev-warn{display:flex;flex-direction:column;gap:5px;margin-top:10px}
 .ev-warn span{background:var(--crit-bg);color:var(--crit);border-radius:7px;padding:5px 10px;font-size:12px;line-height:1.5}
+.rv-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.rv-box{border:1px solid var(--line2);border-radius:10px;padding:10px 12px;background:var(--panel2);min-width:0}
+.rv h3{font-size:11.5px;color:var(--muted);font-weight:600;margin:0 0 6px;letter-spacing:.03em}
+.rv-t{margin:4px 0;font-size:12.5px;line-height:1.6}
+.rv-big{margin:4px 0;font-size:14px}
+.rv-s{margin:2px 0;font-size:11.5px;color:var(--muted);line-height:1.55}
+.rv-why{margin:0 0 6px;font-size:12px;font-weight:600;color:var(--ink2)}
+.rv-why.good{color:var(--good)} .rv-why.warn{color:var(--warn)}
+.rv-wave{display:flex;align-items:flex-end;gap:3px;height:42px;margin-top:8px}
+.rv-wave span{flex:1;background:var(--s3);opacity:.75;border-radius:2px 2px 0 0}
+.rv-wave span.now{background:var(--muted)}
+.rv-wl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:2px}
+.rv-next{margin-top:12px;border-top:1px solid var(--line2);padding-top:10px}
+.rv-next ol{margin:4px 0 0;padding-left:20px} .rv-next li{font-size:12.5px;line-height:1.65;margin-bottom:3px}
+@media (max-width:1100px){.rv-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.rv-grid{grid-template-columns:1fr}}
 .ev-note{margin-top:12px;font-size:10.5px;color:var(--muted);line-height:1.55;border-top:1px solid var(--line2);padding-top:8px}
 .blockhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
 .blockhead h2{font-size:13px;margin:0;font-weight:600}
@@ -489,12 +505,12 @@ const EV_MK = {
 const EV_TR = { up: ['改善', 'tr-up', '↑'], down: ['悪化', 'tr-down', '↓'], flat: ['維持', 'tr-flat', '→'] };
 const EV_NAME = { '露出': 'PV', '興味': 'お気に入り率', 'カート': 'カート率', '転換': 'CVR', '広告': 'ROAS', 'モメンタム': '受注' };
 function evTrend(cur, prev) { if (cur == null || prev == null || !(prev > 0)) return null; const r = cur / prev - 1; return r >= EV_TREND ? 'up' : r <= -EV_TREND ? 'down' : 'flat'; }
-function evAnalyze(code) {
+function evAnalyze(code, end) {   // end＝判定する7日の最終日（省略時は最新日）。前週の評価は end＝最新日−7
   const pr = P[code], it = (EV && EV.items[code]) || {}, bR = BR(pr);
-  const pe = lastIdx(pr.pv), W7 = [pe - 6, pe], W0 = [pe - 13, pe - 7];
+  const pe = end != null ? end : lastIdx(pr.pv), W7 = [pe - 6, pe], W0 = [pe - 13, pe - 7];
   const S = (a, w) => sumZ(a, w[0], w[1]);
   const c = { pv: S(pr.pv, W7), uu: S(pr.uu, W7), fav: S(pr.fav, W7), cart: S(pr.cart, W7), buy: S(pr.buyers, W7), units: S(pr.units, W7), amt: S(pr.amt, W7) };
-  const o = { pv: S(pr.pv, W0), uu: S(pr.uu, W0), fav: S(pr.fav, W0), cart: S(pr.cart, W0), buy: S(pr.buyers, W0), units: S(pr.units, W0) };
+  const o = { pv: S(pr.pv, W0), uu: S(pr.uu, W0), fav: S(pr.fav, W0), cart: S(pr.cart, W0), buy: S(pr.buyers, W0), units: S(pr.units, W0), amt: S(pr.amt, W0) };
   const marks = {}, det = {}, prev = {}, trend = {}, val = {};
   const set = (k, m, v, v0, txt, txt0) => { marks[k] = m; val[k] = v; trend[k] = evTrend(v, v0); det[k] = txt; prev[k] = txt0; };
   if (c.pv > 0 || o.pv > 0) set('露出', EV_MK.pv(c.pv), c.pv, o.pv, num(c.pv) + 'PV', num(o.pv));
@@ -502,7 +518,7 @@ function evAnalyze(code) {
   const bCart = bR ? rateR(bR, RATES.find(r => r.k === 'cart'), W7[0], W7[1]) : null;
   if (c.uu >= EV_MIN && bCart) { const v = c.cart / c.uu, v0 = o.uu >= EV_MIN ? o.cart / o.uu : null; set('カート', EV_MK.cart(v / bCart), v, v0, pct(v, 1) + '／ブランド' + pct(bCart, 1), v0 != null ? pct(v0, 1) : null); }
   if (c.uu >= EV_MIN) { const v = c.buy / c.uu, v0 = o.uu >= EV_MIN ? o.buy / o.uu : null; set('転換', EV_MK.cvr(v), v, v0, pct(v, 2), v0 != null ? pct(v0, 2) : null); }
-  let adState = 'na'; const ae = lastIdx(pr.ad.imp);
+  let adState = 'na'; const ae = Math.min(lastIdx(pr.ad.imp), end != null ? end : Infinity);
   if (ae >= 0 && ae < pe - 2) det['広告'] = `${md(DAYS[ae])}で停止`;   // 広告が止まっている品番は判定しない
   else if (ae >= 0) { const cc = sumZ(pr.ad.cost, ae - 6, ae), rr = sumZ(pr.ad.rev, ae - 6, ae), c0 = sumZ(pr.ad.cost, ae - 13, ae - 7), r0 = sumZ(pr.ad.rev, ae - 13, ae - 7);
     if (cc > 0) { const v = rr / cc, v0 = c0 > 0 ? r0 / c0 : null; set('広告', EV_MK.roas(v), v, v0, pct(v, 0), v0 != null ? pct(v0, 0) : null); adState = v >= 3 ? 'good' : v < 1 ? 'bad' : 'ok'; } }
@@ -643,6 +659,102 @@ function evalCard(code) {
   </div>`;
 }
 
+/* ---------- 前週の課題はどうなったか → 次の一手 ---------- */
+const RV_LT = 4;   // 発注リードタイム（週）
+function evStuckStage(A) {   // 在庫を除いたファネルの課題（基準未満で、改善していない段）
+  const order = [['露出', '露出不足'], ['興味', '刺さらない'], ['カート', 'カート離脱'], ['転換', '転換不足']];
+  const stuck = order.filter(([k]) => (A.marks[k] === '✕' || A.marks[k] === '△') && A.trend[k] !== 'up');
+  return stuck.find(([k]) => A.marks[k] === '✕') || stuck[0] || null;
+}
+const rvPct = r => (r >= 0 ? '+' : '') + Math.round(r * 100) + '%';
+function reviewCard(code) {
+  const E = evalOf(code); if (!E || E.G.hold) return '';
+  const A = E.A, pr = A.pr, c = A.c, o = A.o, pe = A.W7[1], f = i => md(DAYS[i]);
+  const Ap = evAnalyze(code, pe - 7);
+  // ① 前週の課題 → 今週
+  const pi = Ap.hold ? null : evStuckStage(Ap);
+  let issue;
+  if (!pi) issue = `<p class="rv-t">前週（${f(pe - 13)}〜${f(pe - 7)}）は基準未満の段がありませんでした。</p>`;
+  else {
+    const [k, mode] = pi, m = A.marks[k], t = A.trend[k], now = A.det[k] ? A.det[k].split('／')[0] : '—';
+    const st = m === '◎' || m === '○' ? ['解消', 'good', '基準に届いた'] : t === 'up' ? ['改善中', 'info', '基準にはまだ届かないが上がっている'] : t === 'down' ? ['悪化', 'crit', 'さらに下がった'] : ['未解消', 'warn', 'ほぼ変わらず'];
+    issue = `<p class="rv-t"><span class="pill ${st[1]}">${st[0]}</span> 前週の課題は<b>${mode}</b></p>
+      <p class="rv-big num">${EV_NAME[k]} ${Ap.det[k].split('／')[0]} → <b>${now}</b></p><p class="rv-s">${st[2]}（${f(pe - 13)}〜${f(pe - 7)} → ${f(pe - 6)}〜${f(pe)}）</p>`;
+  }
+  // ② 何が動いたか（価格とCVR、PVと広告・ランキング）
+  const pNow = c.units ? c.amt / c.units : meanR(pr.price, pe - 6, pe), pPrev = o.units ? o.amt / o.units : meanR(pr.price, pe - 13, pe - 7);
+  const cvN = c.uu ? c.buy / c.uu : null, cvP = o.uu ? o.buy / o.uu : null, cvOk = c.uu >= EV_MIN && o.uu >= EV_MIN;
+  const pr_ = pNow && pPrev ? pNow / pPrev - 1 : null, cr = cvOk && cvP ? cvN / cvP - 1 : null;
+  const moves = [];
+  if (pr_ != null) {
+    const ptxt = `売れ値 ${yen(pPrev)}→${yen(pNow)}（${rvPct(pr_)}）`, ctxt = cvOk ? `CVR ${pct(cvP, 2)}→${pct(cvN, 2)}` : 'CVRは数が少なく判定なし';
+    let why = '';
+    if (pr_ <= -.05 && cr != null) why = cr >= EV_TREND ? '値下げでCVRが上がった＝価格が効いている' : cr <= -EV_TREND ? '値下げしたのにCVRが下がった＝価格以外（サイズ欠け・画像・露出の質）を疑う' : '値下げしたがCVRは変わらず＝価格以外が原因の可能性';
+    else if (pr_ >= .05 && cr != null) why = cr > -EV_TREND ? '値上げしてもCVRは落ちていない＝値上げ余地あり' : '値上げでCVRが下がった';
+    else if (cr != null) why = cr >= EV_TREND ? '価格はほぼ同じでCVRが上がった＝画像・在庫・お客さんの質が効いた可能性' : cr <= -EV_TREND ? '価格はほぼ同じでCVRが下がった' : '価格・CVRともほぼ同じ';
+    moves.push({ t: `${ptxt}・${ctxt}`, why, cls: /効いている|余地あり|上がった＝/.test(why) ? 'good' : /疑う|下がった|原因/.test(why) ? 'warn' : '' });
+  }
+  const ae = Math.min(lastIdx(pr.ad.imp), pe), adN = ae >= 0 ? sumZ(pr.ad.cost, ae - 6, ae) : 0, adP = ae >= 0 ? sumZ(pr.ad.cost, ae - 13, ae - 7) : 0;
+  const rkN = sumZ(pr.rank, Math.min(pe, RANK_END) - 6, Math.min(pe, RANK_END)), rkP = sumZ(pr.rank, Math.min(pe, RANK_END) - 13, Math.min(pe, RANK_END) - 7);
+  if (o.pv) {
+    const pvr = c.pv / o.pv - 1, drv = [];
+    if (adN || adP) drv.push(`広告費 ${yen(adP)}→${yen(adN)}`);
+    if (rkN || rkP) drv.push(`ランキング経由PV ${num(rkP)}→${num(rkN)}`);
+    let why = '';
+    if (pvr >= EV_TREND) why = adN > adP * 1.2 ? '広告を増やした分PVが増えた' : rkN > rkP * 1.2 ? 'ランキング掲載でPVが増えた' : 'PVが自然に増えた（季節・お気に入りの積み上がり）';
+    else if (pvr <= -EV_TREND) why = adN < adP * .8 ? '広告を減らした・止めた分PVが減った' : rkN < rkP * .8 ? 'ランキングから外れてPVが減った' : 'PVが自然に減った';
+    moves.push({ t: `PV ${num(o.pv)}→${num(c.pv)}（${rvPct(pvr)}）${drv.length ? '・' + drv.join('・') : ''}`, why, cls: pvr >= EV_TREND ? 'good' : pvr <= -EV_TREND ? 'warn' : '' });
+  }
+  if (o.units || c.units) moves.push({ t: `受注 ${num(o.units)}→${num(c.units)}点（予約 ${num(sumZ(pr.resv || [], pe - 13, pe - 7))}→${num(sumZ(pr.resv || [], pe - 6, pe))}点）`, why: '', cls: '' });
+  // ③ 在庫と季節（波動）
+  const stock = pr.skus.reduce((a, k) => a + k.stock, 0), weekly = (c.units + o.units) / 2;
+  const wv = (D.wave || {})[(D.sc || {})[code]], r4 = wv && wv.n4 && wv.cur ? wv.n4 / wv.cur : null, r8 = wv && wv.n8 && wv.cur ? wv.n8 / wv.cur : null;
+  const wks = weekly > 0 ? stock / weekly : null, wksAdj = wks != null && r4 ? stock / (weekly * r4) : wks;
+  const wMax = wv ? Math.max(wv.cur, ...wv.weeks.filter(Boolean)) : 1, wH = x => x ? Math.max(3, Math.round(x / wMax * 40)) : 2;
+  const wbars = wv ? `<div class="rv-wave"><span class="now" title="今週 ${wv.cur.toFixed(2)}" style="height:${wH(wv.cur)}px"></span>${wv.weeks.map((x, i) => `<span title="${i + 1}週後 ${x ? x.toFixed(2) : '—'}（今週比 ${x ? rvPct(x / wv.cur - 1) : '—'}）" style="height:${wH(x)}px"></span>`).join('')}</div>
+    <div class="rv-wl"><span>今週</span><span>1週後</span><span>8週後</span></div><p class="rv-s">季節の山（昨年の波動・${(D.sc || {})[code]}）。灰色＝今週</p>` : '';
+  const stockTxt = `<p class="rv-big num">在庫 <b>${num(stock)}</b>枚・あと<b>${wksAdj != null ? wksAdj.toFixed(1) : '—'}</b>週</p>
+    <p class="rv-s">売れペース 週${num(weekly, 1)}点（直近2週平均）${r4 ? `・これから4週の需要は季節で ${rvPct(r4 - 1)}（8週で ${rvPct(r8 - 1)}）` : '・このカテゴリの波動データなし'}</p>${wbars}`;
+  // ④ 目標に向けて（目標逆算と同じ計算を直近7日で）
+  const G = (D.goal || {})[pr.brand], bR = BR(pr);
+  let goalTxt = '<p class="rv-s">このブランドの目標がありません</p>', up = 0, grp = null, gAct = '';
+  if (G && bR) {
+    const S = a => sumZ(a || [], pe - 6, pe), bAmt = S(bR.amt), bUU = S(bR.uu), bPV = S(bR.pv), bBuy = S(bR.buyers);
+    const wt = G.target * 7 / G.dim, gap = wt - bAmt, bU = bUU / bPV, bC = bBuy / bUU, bA = bAmt / bBuy;
+    const uupv = c.pv ? c.uu / c.pv : bU, fav = c.pv ? c.fav / c.pv : 0, cvr = c.uu ? c.buy / c.uu : 0, cvrS = (c.buy + 300 * bC) / (c.uu + 300), aov = c.buy ? c.amt / c.buy : bA, unit = c.units ? c.amt / c.units : aov;
+    if (c.pv < 1000) { grp = ['①', '見られていない', 'PVが週1,000になったら']; up = c.pv >= 300 ? (1000 - c.pv) * uupv * cvrS * aov : 0; gAct = '露出づくり（広告・TS・ランキング枠・サムネ・商品名）'; }
+    else if (fav < .04) { grp = ['②', '刺さっていない', 'お気に入り率が4%になったら']; up = c.uu * cvrS * (fav > 0 ? .04 / fav - 1 : 1) * aov; gAct = '1枚目の画像・色展開・商品そのものを見直す'; }
+    else if (cvr < .015) { grp = ['③', '買われていない', 'CVRが1.5%になったら']; up = c.uu * (.015 - cvr) * aov; gAct = '値段を疑う（クーポン・値下げで反応を見る）。すでに大きく引いているならサイズ・在庫・画像'; }
+    else { grp = ['④', '良好', c.pv < 3000 ? 'PVが週3,000（主力）になったら' : '主力']; up = c.pv < 3000 ? (3000 - c.pv) * uupv * cvrS * aov : 0; gAct = c.pv < 3000 ? 'よく買われる型：露出を足して主力に（広告増額・TS・ランキング）' : '主力：在庫を切らさない・露出を維持'; }
+    up = Math.max(0, Math.min(up, stock > 0 ? stock / 4 * unit : 0));
+    goalTxt = `<p class="rv-big num">週目標 ${yen(wt)}・直近7日 ${yen(bAmt)}</p>
+      <p class="rv-s">${pr.brand}の${+G.month.slice(5)}月目標 ${yen(G.target)}。${gap > 0 ? `週 <b>${yen(gap)}</b> 足りない` : '週目標を超えている'}</p>
+      <p class="rv-t">この品番は <span class="pill info">${grp[0]} ${grp[1]}</span>　${grp[2]}${up >= 1 ? ` <b>週+${yen(up)}</b>${gap > 0 ? `（不足の${Math.round(up / gap * 100)}%）` : ''}` : ''}</p>`;
+  }
+  // ⑤ 次の一手（優先順）
+  const next = [];
+  if (wksAdj != null && wksAdj < RV_LT) next.push(`<b>発注</b>：在庫があと約${wksAdj.toFixed(1)}週（季節込み）でLT${RV_LT}週を切る。発注スケジュールの竹・松を見て追加発注を`);
+  if (pi) { const [k] = pi, m = A.marks[k], t = A.trend[k];
+    if (!(m === '◎' || m === '○') && t !== 'up' && E.BN.stage !== k) next.push(`<b>前週からの課題（${pi[1]}）</b>が残っている：${(EV_COPY[pi[1]] || {}).mid || (EV_COPY[pi[1]] || {}).high || ''}`); }
+  const pm = moves[0];
+  if (pm && /値下げでCVRが上がった/.test(pm.why)) next.push(`<b>価格</b>：この価格（${yen(pNow)}）で反応あり。在庫が持つ範囲で維持し、${wksAdj != null && wksAdj < 6 ? '在庫が少ないので値下げ幅は広げない' : '露出を足して売り切りを早める'}`);
+  else if (pm && /値下げしたが|値下げしたのに/.test(pm.why)) next.push('<b>価格</b>：値下げの効果が出ていない。値段を戻して粗利を守るか、サイズ欠け・画像を先に直す');
+  else if (pm && /値上げ余地/.test(pm.why)) next.push('<b>価格</b>：値上げしても転換は落ちていない。粗利を優先して今の価格を維持');
+  if (grp && up >= 1) next.push(`<b>目標</b>：${grp[0]}${grp[1]} → ${gAct}（できれば週+${yen(up)}）`);
+  if (r4 != null && r4 >= 1.15 && (wksAdj == null || wksAdj >= RV_LT)) next.push(`<b>季節</b>：これから4週で需要が${rvPct(r4 - 1)}の山。露出（広告・TS）を前倒しして山に乗せる`);
+  else if (r4 != null && r4 <= .85 && wksAdj != null && wksAdj > 12) next.push(`<b>季節</b>：これから需要が${rvPct(r4 - 1)}で下り坂なのに在庫が${wksAdj.toFixed(0)}週分。早めに消化（クーポン・TS）を`);
+  return `<div class="panel rv"><div class="ph"><h2>前週の課題はどうなったか・次の一手</h2><span class="sub">今週＝${f(pe - 6)}〜${f(pe)}・前週＝${f(pe - 13)}〜${f(pe - 7)}</span></div>
+    <div class="rv-grid">
+      <div class="rv-box"><h3>前週の課題</h3>${issue}</div>
+      <div class="rv-box"><h3>何が動いたか</h3>${moves.length ? moves.map(x => `<p class="rv-t num">${x.t}</p>${x.why ? `<p class="rv-why ${x.cls}">→ ${x.why}</p>` : ''}`).join('') : '<p class="rv-s">前週のデータがありません</p>'}</div>
+      <div class="rv-box"><h3>在庫と季節</h3>${stockTxt}</div>
+      <div class="rv-box"><h3>目標に向けて</h3>${goalTxt}</div>
+    </div>
+    ${next.length ? `<div class="rv-next"><h3>次の一手</h3><ol>${next.slice(0, 4).map(x => `<li>${x}</li>`).join('')}</ol></div>` : ''}
+    <p class="rv-s" style="margin-top:8px">季節は昨年の波動データ（前年のイベント週も入るので目安）。目標の伸びしろは目標逆算タブと同じ計算を直近7日で行ったもの（4週で売り切れる在庫までで頭打ち）。</p>
+  </div>`;
+}
+
 /* ---------- 概要 ---------- */
 function renderOverview(v) {
   const pr = P[state.p], [s, e] = range(), pe = lastIdx(pr.pv), w = [pe - 6, pe], wp = [pe - 13, pe - 7];
@@ -703,6 +815,7 @@ function renderOverview(v) {
     <div class="kpis small">${tilesShow.map(([l, val, d]) => `<div class="kpi"><span class="l">${l}${ALL ? '・通算' : l.startsWith('在庫') ? '' : '・直近7日'}</span><span class="v num">${val}</span>${d}</div>`).join('')}</div>
     <div class="kpis rates">${rateTiles.map(rateTile).join('')}</div>
     ${evalCard(state.p)}
+    ${reviewCard(state.p)}
     <div class="grid g-side">
       <div class="grid">
         <div class="panel"><div class="ph"><h2>受注点数（週別）</h2><span class="sub">期間 ${md(DAYS[s])}〜${md(DAYS[pe])}・月曜始まり・最後の週は${md(DAYS[pe])}までの途中</span></div>${RSV_LEG()}<div class="chart" id="ovU"></div></div>
