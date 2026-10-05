@@ -439,6 +439,9 @@ const unitSeries = (pr, bs) => [{ label: '通常', type: 'bar', stack: true, col
   { label: '予約', type: 'bar', stack: true, color: 'var(--rsv)', values: bs.map(b => rsvB(pr, b)) }];
 const RSV_LEG = () => legend([['var(--s1)', '通常'], ['var(--rsv)', `予約（売上集計・${md(DAYS[SKU_END])}まで）`]]);
 const SKU_SOON = 3, SKU_HEAVY = 12;   // SKUの在庫判定（今の在庫があと何週もつか）：3週未満＝切れそう／12週以上＝余りぎみ
+// 発売日：売上推移表の販売開始日（なければZOZOの商品別実績に初めて出た日）。直近120日以内なら何日目か
+const relChip = pr => { const d = pr.rel || pr.start; if (!d) return ''; const [y, m, dd] = d.split('-').map(Number), n = Math.round((DAYS[N - 1] - new Date(y, m - 1, dd)) / 864e5) + 1;
+  return `<span class="chip num" title="${pr.rel ? '販売開始日（売上推移表）' : 'ZOZOの商品別実績に初めて出た日'}${pr.rel && pr.start && pr.start !== pr.rel ? '・ZOZO初出 ' + pr.start.replace(/-/g, '/') : ''}">発売 ${y}/${m}/${dd}${n > 0 && n <= 120 ? `（${n}日目）` : ''}</span>`; };
 const skuName = k => (k.color || '') + (k.size ? ' / ' + k.size : '');
 const RATES = [
   { k: 'cvr', l: 'CVR', def: '購入者 ÷ UU', n: 'buyers', d: 'uu', dg: 2 },
@@ -478,7 +481,7 @@ function renderChrome() {
     $('#prevP').onclick = () => step(-1); $('#nextP').onclick = () => step(1);
   }
   const pr = P[state.p], li = lastIdx(pr.price), cur = li >= 0 ? pr.price[li] : null, off = cur && pr.proper ? 1 - cur / pr.proper : null;
-  $('#phead').innerHTML = `<div><h1>${pr.name}</h1><div class="chips"><span class="chip strong">${pr.brand}</span><span class="chip num">${state.p}</span><span class="chip">SKU ${pr.skus.length}</span>
+  $('#phead').innerHTML = `<div><h1>${pr.name}</h1><div class="chips"><span class="chip strong">${pr.brand}</span><span class="chip num">${state.p}</span>${relChip(pr)}<span class="chip">SKU ${pr.skus.length}</span>
       <span class="chip num">在庫 ${num(pr.skus.reduce((a, k) => a + k.stock, 0))}</span>${evalChip(state.p)}</div></div>
     <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
       <div><div class="foot">直近の売れ値（税抜・${li >= 0 ? md(DAYS[li]) : '—'}）</div><div class="pricebox num"><span class="big">${yen(cur)}</span>${pr.proper ? `<span class="was">${yen(pr.proper)}</span>` : ''}${off != null && off > .01 ? `<span class="off">${Math.round(off * 100)}%OFF</span>` : ''}</div></div>
