@@ -201,6 +201,8 @@ tbody tr.click:hover{background:var(--panel2)}
 .tt .stk{position:sticky;left:0;z-index:1;background:var(--panel);text-align:left;border-right:1px solid var(--line);font-weight:500;color:var(--ink)}
 .tt th.stk{color:var(--muted)}
 .tt .sun{background:var(--panel2)}
+.tt.heat td{min-width:44px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:0}
 .tt tbody tr:hover td{background:var(--accent-soft)}
 /* charts */
 .chart{position:relative;width:100%}
@@ -288,7 +290,7 @@ const SWATCH = { 'ブルー': '#4f7fbf', 'ライトグレー': '#cfd3d8', 'グ�
   'レッド': '#b8403e', 'チャコールグレー': '#4b4f55', 'オフホワイト': '#efece4', 'ライトブルー': '#9fc0e2', 'ピスタチオ': '#b5c98e', 'ライトパープル': '#b7a6d6', 'ベージュ': '#d9c6a5', 'アイボリー': '#efe8d6', 'ブラック': '#222428', 'ホワイト': '#f7f7f5', 'グリーン': '#4f7a4a', 'イエロー': '#e2c04c', 'オレンジ': '#e08a3c' };
 
 const hashP = () => { const h = decodeURIComponent(location.hash.slice(1)); return P[h] ? h : null; };
-const state = { span: '7d', p: hashP() || KEYS[0], tab: 'overview', period: '60', gran: 'day', tableOpen: true, dmode: 'rate' };
+const state = { span: '7d', p: hashP() || KEYS[0], tab: 'overview', period: '60', gran: 'day', tableOpen: true, dmode: 'rate', skuMode: 'units', skuTblOpen: true };
 const TABS = [['overview', '概要', '今どうなっているか'], ['daily', '日次', 'いつ何が動いたか'], ['sku', 'SKU', 'どの色が売れて、どれが切れるか'], ['ad', '広告', '広告は回収できているか']];
 
 /* ---------- 期間・バケット ---------- */
@@ -356,7 +358,7 @@ function chart(host, o) {
       const bw = Math.max(1.5, Math.min(22, band * .66)), off = !s.stack && nbar > 1 ? (si === 0 ? -bw / 4 : bw / 4) : 0;
       s.values.forEach((v, i) => { if (v == null || v <= 0) return; const b0 = s.stack ? base[i] : 0, y = Y(b0 + v), h = Y(y0 + b0) - y;
         if (s.stack) base[i] += v;
-        g += `<rect x="${X(i) - bw / 2 + off}" y="${y}" width="${bw}" height="${Math.max(h, .5)}" rx="${s.stack ? 0 : Math.min(2, bw / 3)}" fill="${s.color}"/>`; });
+        g += `<rect x="${X(i) - bw / 2 + off}" y="${y}" width="${bw}" height="${Math.max(h, .5)}" rx="${s.stack ? 0 : Math.min(2, bw / 3)}" fill="${s.color}"${s.stroke ? ` stroke="${s.stroke}" stroke-width=".7"` : ''}/>`; });
     } else if (s.type === 'line' || s.type === 'step') {
       let d = '', prev = null;
       s.values.forEach((v, i) => {
@@ -400,7 +402,7 @@ function chart(host, o) {
     }
   };
   const idxAt = ev => { const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width; return Math.max(0, Math.min(n - 1, Math.floor((px - L) / band))); };
-  hit.addEventListener('mousemove', ev => { const i = idxAt(ev); (o.group || [api]).forEach(c => c.setHover(i)); if (tipFn) showTip(ev, tipFn(i)); });
+  hit.addEventListener('mousemove', ev => { const i = idxAt(ev); (o.group || [api]).forEach(c => c.setHover(i)); const tf = 'tip' in o ? o.tip : tipFn; if (tf) showTip(ev, tf(i)); });
   hit.addEventListener('mouseleave', () => { (o.group || [api]).forEach(c => c.setHover(null)); hideTip(); });
   if (o.onClick) { hit.style.cursor = 'pointer'; hit.addEventListener('click', ev => o.onClick(idxAt(ev))); }
   if (o.group) o.group.push(api);
@@ -486,8 +488,8 @@ function renderChrome() {
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => { state.tab = b.dataset.t; renderAll(); });
   $('#segPeriod').innerHTML = [['30', '30日'], ['60', '60日'], ['all', '全期間']].map(([k, l]) => `<button aria-pressed="${state.period === k}" data-v="${k}">${l}</button>`).join('');
   document.querySelectorAll('#segPeriod button').forEach(b => b.onclick = () => { state.period = b.dataset.v; renderAll(); });
-  const granOff = state.tab === 'overview' || state.tab === 'sku';
-  $('#segGran').innerHTML = [['day', '日'], ['week', '週']].map(([k, l]) => `<button aria-pressed="${state.gran === k}" data-v="${k}" ${granOff ? 'disabled title="日次・広告タブで使えます"' : ''}>${l}</button>`).join('');
+  const granOff = state.tab === 'overview';
+  $('#segGran').innerHTML = [['day', '日'], ['week', '週']].map(([k, l]) => `<button aria-pressed="${state.gran === k}" data-v="${k}" ${granOff ? 'disabled title="日次・SKU・広告タブで使えます"' : ''}>${l}</button>`).join('');
   document.querySelectorAll('#segGran button').forEach(b => b.onclick = () => { state.gran = b.dataset.v; renderAll(); });
 }
 
@@ -932,6 +934,22 @@ function wireDailyTable() {
 }
 
 /* ---------- SKU ---------- */
+const SKU_PAL = ['#2a78d6', '#eb6834', '#1baf7a', '#4a3aa7', '#d4a017', '#c2185b', '#00838f', '#6d4c41', '#7cb342', '#5c6bc0', '#8e24aa', '#546e7a'];
+function skuColors(rows) {
+  const used = new Set();
+  return rows.map((r, i) => { let c = SWATCH[r.k.color]; if (!c || used.has(c)) c = SKU_PAL.find(x => !used.has(x)) || SKU_PAL[i % SKU_PAL.length]; used.add(c); return c; });
+}
+const isLight = hex => { const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return false; const n = parseInt(m[1], 16); return (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255 > .82; };
+function skuTrendTable(rows, cols, bs, key, wk) {
+  const vals = rows.map(r => bs.map(b => bsum(r.k[key], b) || 0)), mx = Math.max(1, ...vals.flat());
+  const base = key === 'units' ? 'var(--s1)' : 'var(--s3)';
+  const cell = v => `<td style="background:${v ? `color-mix(in srgb, ${base} ${Math.round(12 + v / mx * 58)}%, var(--panel))` : 'transparent'};${v / mx > .55 ? 'color:#fff;' : ''}">${v ? num(v) : '<span class="flat">·</span>'}</td>`;
+  const tot = bs.map((_, i) => vals.reduce((a, r) => a + r[i], 0));
+  const sun = b => !wk && b.d.getDay() === 0 ? ' class="sun"' : '';
+  return `<table class="tt heat"><thead><tr><th class="stk">${wk ? '週' : '日付'}</th>${bs.map(b => `<th${sun(b)}>${wk ? b.label : md(b.d)}${wk ? '' : `<small>${DOW[b.d.getDay()]}</small>`}</th>`).join('')}<th>合計</th></tr></thead>
+    <tbody>${rows.map((r, j) => `<tr><td class="stk"><i class="dot" style="background:${cols[j]}"></i>${skuName(r.k)}</td>${vals[j].map(cell).join('')}<td><b>${num(vals[j].reduce((a, x) => a + x, 0))}</b></td></tr>`).join('')}
+    <tr class="sep"><td class="stk"><b>合計</b></td>${tot.map(v => `<td><b>${num(v)}</b></td>`).join('')}<td><b>${num(tot.reduce((a, x) => a + x, 0))}</b></td></tr></tbody></table>`;
+}
 function renderSku(v) {
   const pr = P[state.p], [s, e] = range(), st = skuStats(pr, s, Math.min(e, SKU_END)), rows = st.rows;
   if (!rows.length) { v.innerHTML = '<div class="panel empty">SKUのデータがありません</div>'; return; }
@@ -953,10 +971,26 @@ function renderSku(v) {
         <td>${num(r.units)}</td><td>${num(r.u7)} <span class="${r.u7 > r.up7 ? 'up' : r.u7 < r.up7 ? 'down' : 'flat'}">${r.u7 > r.up7 ? '↑' : r.u7 < r.up7 ? '↓' : '→'}</span></td><td>${r.r7 ? `<b>${num(r.r7)}</b>` : '<span class="flat">0</span>'}</td><td>${num(r.fav)}</td>
         <td>${bar(r.su, 'var(--s1)')}</td><td>${bar(r.sf, 'var(--s3)')}</td><td>${bar(r.ss, 'var(--ink2)')}</td>
         <td><span class="pill ${r.status[0]}">${r.weeks != null ? r.weeks.toFixed(1) + '週' : r.status[1]}</span></td><td class="l"><div class="chart spark" id="sp${j}" style="width:150px"></div></td></tr>`).join('')}
-      </tbody></table></div><div class="foot" style="margin-top:8px">売れ・予約・お気に入りはZOZO（本店＋Yahoo店。予約は売上集計の販売タイプ「予約」で、売れに含まれる）、在庫は全チャネル（推移表・POP-UP取り置き除外）。上の文は「あと」（直近2週の売れペースで今の在庫がもつ週数）で判定：3週未満＝切れそう、12週以上＝余りぎみ。</div></div>`;
+      </tbody></table></div><div class="foot" style="margin-top:8px">売れ・予約・お気に入りはZOZO（本店＋Yahoo店。予約は売上集計の販売タイプ「予約」で、売れに含まれる）、在庫は全チャネル（推移表・POP-UP取り置き除外）。上の文は「あと」（直近2週の売れペースで今の在庫がもつ週数）で判定：3週未満＝切れそう、12週以上＝余りぎみ。</div></div>
+    <div class="panel"><div class="ph"><h2>SKU別の推移</h2><div class="seg sm" id="skuMode">${[['units', '売れ'], ['fav', 'お気に入り']].map(([k, l]) => `<button aria-pressed="${state.skuMode === k}" data-v="${k}">${l}</button>`).join('')}</div></div>
+      <div class="foot" style="margin:-4px 0 6px">${state.gran === 'week' ? '週別（月曜始まり）' : '日別'}・${md(DAYS[s])}〜${md(DAYS[Math.min(e, SKU_END)])}・棒はSKUごとの積み上げ（下ほどよく売れている色）。粒度は右上の「日／週」で切り替え</div>
+      <div id="skuLeg"></div><div class="chart" id="skuStack"></div>
+      <details id="skuDet" ${state.skuTblOpen ? 'open' : ''} style="margin-top:8px"><summary>表で見る（色が濃いほど多い）</summary><div class="tw" id="skuTbl"></div></details>
+    </div>`;
   tipFn = null;
   const bs = buckets(s, Math.min(e, SKU_END), 'day');
-  rows.forEach((r, j) => chart($('#sp' + j), { id: ++CID, buckets: bs, h: 30, bare: true, minW: 140, series: [{ type: 'bar', color: 'var(--s1)', values: bs.map(b => bsum(r.k.units, b)) }] }));
+  rows.forEach((r, j) => chart($('#sp' + j), { id: ++CID, buckets: bs, h: 30, bare: true, minW: 140, tip: null, series: [{ type: 'bar', color: 'var(--s1)', values: bs.map(b => bsum(r.k.units, b)) }] }));
+  // SKU別の推移
+  const wk = state.gran === 'week', key = state.skuMode, tb = buckets(s, Math.min(e, SKU_END), state.gran), cols = skuColors(rows);
+  $('#skuLeg').innerHTML = legend(rows.map((r, j) => [cols[j], skuName(r.k)]));
+  chart($('#skuStack'), { id: ++CID, buckets: tb, h: 200, aria: 'SKU別の' + (key === 'units' ? '売れ' : 'お気に入り') + 'の推移',
+    tip: i => { const b = tb[i], items = rows.map((r, j) => [cols[j], skuName(r.k), bsum(r.k[key], b) || 0]).filter(x => x[2]).sort((a, c) => c[2] - a[2]);
+      return `<h4>${wk ? b.label : mdw(b.d)}</h4>` + (items.length ? items.map(([c, n, v]) => `<div class="r"><span><i style="background:${c}"></i>${n}</span><span>${num(v)}</span></div>`).join('') + `<div class="r"><span><b>合計</b></span><span><b>${num(items.reduce((a, x) => a + x[2], 0))}</b></span></div>` : '<div class="foot">なし</div>'); },
+    series: rows.map((r, j) => ({ type: 'bar', stack: true, color: cols[j], stroke: isLight(cols[j]) ? 'var(--muted)' : null, values: tb.map(b => bsum(r.k[key], b) || 0) })) });
+  $('#skuTbl').innerHTML = skuTrendTable(rows, cols, tb, key, wk);
+  requestAnimationFrame(() => { const t = $('#skuTbl'); if (t) t.scrollLeft = t.scrollWidth; });
+  $('#skuDet').addEventListener('toggle', () => { state.skuTblOpen = $('#skuDet').open; });
+  document.querySelectorAll('#skuMode button').forEach(b => b.onclick = () => { state.skuMode = b.dataset.v; renderAll(); });
   document.querySelectorAll('tr[data-k]').forEach(t => t.onclick = () => openSku(+t.dataset.k));
 }
 
