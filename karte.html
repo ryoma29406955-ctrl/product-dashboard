@@ -138,6 +138,12 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent2);o
 .mk-a{color:var(--good)}.mk-b{color:var(--s1)}.mk-c{color:var(--warn)}.mk-d{color:var(--crit)}.mk-na{color:var(--line)}
 .ev-str{display:flex;flex-direction:column;gap:5px;margin-top:10px}
 .ev-str span{background:var(--good-bg);color:var(--good);border-radius:7px;padding:5px 10px;font-size:12px;line-height:1.5}
+.evc-t{font-size:10.5px;font-weight:600;line-height:1.35;margin-top:2px}
+.evc-t small{display:block;font-weight:400;color:var(--muted)}
+.tr-up{color:var(--good)} .tr-down{color:var(--crit)} .tr-flat{color:var(--muted)}
+.ev-imp{color:var(--good);font-weight:600}
+.ev-warn{display:flex;flex-direction:column;gap:5px;margin-top:10px}
+.ev-warn span{background:var(--crit-bg);color:var(--crit);border-radius:7px;padding:5px 10px;font-size:12px;line-height:1.5}
 .ev-note{margin-top:12px;font-size:10.5px;color:var(--muted);line-height:1.55;border-top:1px solid var(--line2);padding-top:8px}
 .blockhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
 .blockhead h2{font-size:13px;margin:0;font-weight:600}
@@ -469,149 +475,138 @@ function renderChrome() {
   document.querySelectorAll('#segGran button').forEach(b => b.onclick = () => { state.gran = b.dataset.v; renderAll(); });
 }
 
-/* ---------- 評価（本番ダッシュボードの自動診断をそのまま移植） ---------- */
+/* ---------- 評価（直近7日を基準で判定し、前7日との差で 改善／維持／悪化 を見る） ---------- */
 const EV = D.ev || null;
-const EVP = EV ? EV.peers.map(([sc, c, uu, fav, cart, buy, pv]) => ({ sc, c, tot: { uu, fav, cart, buy, pv } })) : [];
-function evSdiv(a,b){return b>0?a/b:null;}
-function evPctl(arr,v){if(!arr||!arr.length)return null;let c=0;for(const x of arr)if(x<=v)c++;return c/arr.length;}
-function evPeers(p){
-  let g=EVP.filter(x=>x.sc===p.sc), scope='子:'+(p.sc||'—');
-  if(g.length<8){g=EVP.filter(x=>x.c===p.c); scope='親:'+(p.c||'—');}
-  if(g.length<8){g=EVP; scope='全体';}
-  return {g,scope};
+const EV_MIN = 200;      // 7日のPV・UUがこれ未満の段は数が少なく率がぶれるので判定しない
+const EV_TREND = 0.10;   // 前7日から±10%以上動いたら改善／悪化、それ未満は維持
+const evSdiv = (a, b) => b > 0 ? a / b : null;
+const EV_MK = {
+  pv: v => v >= 3000 ? '◎' : v >= 1000 ? '○' : v >= 300 ? '△' : '✕',          // PV（7日＝1週間）
+  fav: v => v >= .06 ? '◎' : v >= .04 ? '○' : v >= .03 ? '△' : '✕',           // お気に入り率（÷PV）
+  cvr: v => v >= .015 ? '◎' : v >= .010 ? '△' : '✕',                          // CVR（購入者÷UU）
+  cart: r => r >= 1.10 ? '◎' : r >= .85 ? '○' : r >= .60 ? '△' : '✕',          // カート率はブランド平均との比
+  roas: v => v >= 3 ? '◎' : v >= 2 ? '○' : v >= 1 ? '△' : '✕' };
+const EV_TR = { up: ['改善', 'tr-up', '↑'], down: ['悪化', 'tr-down', '↓'], flat: ['維持', 'tr-flat', '→'] };
+const EV_NAME = { '露出': 'PV', '興味': 'お気に入り率', 'カート': 'カート率', '転換': 'CVR', '広告': 'ROAS', 'モメンタム': '受注' };
+function evTrend(cur, prev) { if (cur == null || prev == null || !(prev > 0)) return null; const r = cur / prev - 1; return r >= EV_TREND ? 'up' : r <= -EV_TREND ? 'down' : 'flat'; }
+function evAnalyze(code) {
+  const pr = P[code], it = (EV && EV.items[code]) || {}, bR = BR(pr);
+  const pe = lastIdx(pr.pv), W7 = [pe - 6, pe], W0 = [pe - 13, pe - 7];
+  const S = (a, w) => sumZ(a, w[0], w[1]);
+  const c = { pv: S(pr.pv, W7), uu: S(pr.uu, W7), fav: S(pr.fav, W7), cart: S(pr.cart, W7), buy: S(pr.buyers, W7), units: S(pr.units, W7), amt: S(pr.amt, W7) };
+  const o = { pv: S(pr.pv, W0), uu: S(pr.uu, W0), fav: S(pr.fav, W0), cart: S(pr.cart, W0), buy: S(pr.buyers, W0), units: S(pr.units, W0) };
+  const marks = {}, det = {}, prev = {}, trend = {}, val = {};
+  const set = (k, m, v, v0, txt, txt0) => { marks[k] = m; val[k] = v; trend[k] = evTrend(v, v0); det[k] = txt; prev[k] = txt0; };
+  if (c.pv > 0 || o.pv > 0) set('露出', EV_MK.pv(c.pv), c.pv, o.pv, num(c.pv) + 'PV', num(o.pv));
+  if (c.pv >= EV_MIN) { const v = c.fav / c.pv, v0 = o.pv >= EV_MIN ? o.fav / o.pv : null; set('興味', EV_MK.fav(v), v, v0, pct(v, 1), v0 != null ? pct(v0, 1) : null); }
+  const bCart = bR ? rateR(bR, RATES.find(r => r.k === 'cart'), W7[0], W7[1]) : null;
+  if (c.uu >= EV_MIN && bCart) { const v = c.cart / c.uu, v0 = o.uu >= EV_MIN ? o.cart / o.uu : null; set('カート', EV_MK.cart(v / bCart), v, v0, pct(v, 1) + '／ブランド' + pct(bCart, 1), v0 != null ? pct(v0, 1) : null); }
+  if (c.uu >= EV_MIN) { const v = c.buy / c.uu, v0 = o.uu >= EV_MIN ? o.buy / o.uu : null; set('転換', EV_MK.cvr(v), v, v0, pct(v, 2), v0 != null ? pct(v0, 2) : null); }
+  let adState = 'na'; const ae = lastIdx(pr.ad.imp);
+  if (ae >= 0 && ae < pe - 2) det['広告'] = `${md(DAYS[ae])}で停止`;   // 広告が止まっている品番は判定しない
+  else if (ae >= 0) { const cc = sumZ(pr.ad.cost, ae - 6, ae), rr = sumZ(pr.ad.rev, ae - 6, ae), c0 = sumZ(pr.ad.cost, ae - 13, ae - 7), r0 = sumZ(pr.ad.rev, ae - 13, ae - 7);
+    if (cc > 0) { const v = rr / cc, v0 = c0 > 0 ? r0 / c0 : null; set('広告', EV_MK.roas(v), v, v0, pct(v, 0), v0 != null ? pct(v0, 0) : null); adState = v >= 3 ? 'good' : v < 1 ? 'bad' : 'ok'; } }
+  if (c.units >= 5 || o.units >= 5) { const r = o.units ? c.units / o.units - 1 : 1;
+    set('モメンタム', r >= .4 ? '◎' : r > -.15 ? '○' : r > -.3 ? '△' : '✕', c.units, o.units, num(c.units) + '点', num(o.units) + '点'); }
+  // 在庫：今の在庫（推移表のカバー日数）と最新週のZOZO販売可能数
+  const so = it.so || [], cover = it.cover, hasCover = cover !== '' && cover != null, soNow = so.length ? !!so[so.length - 1] : false;
+  const demand = ((it.tot || {}).units || 0) >= 50 || c.units + o.units >= 5;
+  let stockState = 'ok';
+  if (hasCover && cover < 28) stockState = 'shortage';
+  else if (soNow && demand) stockState = 'shortage';
+  else if (hasCover && cover >= 180) stockState = 'surplus';
+  if (stockState === 'shortage' || stockState === 'surplus') marks['在庫'] = '✕';
+  else if (hasCover) marks['在庫'] = cover >= 42 ? '◎' : '○';
+  if (hasCover) det['在庫'] = num(cover) + '日分'; if (soNow) det['在庫'] = (det['在庫'] ? det['在庫'] + '・' : '') + 'ZOZO欠品中';
+  // 保存止まり（お気に入りは付くのに買われない）・セール依存
+  const bF2B = bR ? rateR(bR, RATES.find(r => r.k === 'f2b'), W7[0], W7[1]) : null, f2b = evSdiv(c.buy, c.fav);
+  const saveStuck = val['転換'] != null && val['転換'] < .015 && bF2B != null && f2b != null && c.fav >= 30 && f2b < bF2B * 0.55;
+  const unit = c.units ? c.amt / c.units : null, saleDep = !!(pr.proper && unit && unit < pr.proper * 0.85);
+  const hold = c.uu < 100 && o.uu < 100;
+  return { code, pr, it, c, o, W7, W0, marks, det, prev, trend, val, adState, stockState, cover: hasCover ? cover : null, soNow, saveStuck, saleDep, unit, hold };
 }
-const _evBench={};
-function evBenchFor(p){
-  const key=(p.sc||'')+'|'+(p.c||'');
-  if(_evBench[key])return _evBench[key];
-  const {g,scope}=evPeers(p);
-  const pr=(nk,dk)=>{let n=0,d=0;for(const q of g){const T=q.tot||{};n+=(T[nk]||0);d+=(T[dk]||0);}return d>0?n/d*100:null;};
-  const uuArr=g.map(x=>(x.tot&&x.tot.uu)||0).filter(x=>x>0).sort((a,b)=>a-b);
-  const b={scope,n:g.length,favrate:pr('fav','uu'),favrate_pv:pr('fav','pv'),cartrate:pr('cart','uu'),
-    cvr:pr('buy','uu'),fav2buy:pr('buy','fav'),uuArr};
-  _evBench[key]=b;return b;
+function evGrade(A) {
+  if (A.hold) return { g: '新規', hold: true, score: null };
+  const SC = { '◎': 100, '○': 75, '△': 45, '✕': 15 }, W = { '露出': .24, '興味': .20, 'カート': .10, '転換': .24, 'モメンタム': .12 };
+  let num_ = 0, den = 0;
+  for (const k of Object.keys(W)) { const m = A.marks[k]; if (m == null) continue; num_ += SC[m] * W[k]; den += W[k]; }
+  let base = den > 0 ? num_ / den : 50;
+  ['露出', '興味', 'カート', '転換'].forEach(k => { if (A.trend[k] === 'up') base += 2; else if (A.trend[k] === 'down') base -= 2; });
+  const uT = ((A.it.tot || {}).units) || 0; base += uT >= 2000 ? 8 : uT >= 500 ? 4 : uT < 50 ? -8 : 0;
+  if (A.stockState === 'shortage') base = Math.max(base, 55);
+  if (A.adState === 'good') base += 5; else if (A.adState === 'bad') base -= 8;
+  base = Math.max(0, Math.min(100, Math.round(base)));
+  return { g: base >= 82 ? 'S' : base >= 68 ? 'A' : base >= 52 ? 'B' : base >= 36 ? 'C' : 'D', score: base };
 }
-function evAnalyze(p,b){
-  const tot=p.tot||{}, marks={}, det={}, L=p.units.length-1;
-  const mk=(r,g0,o0,d0)=>r>=g0?'◎':r>=o0?'○':r>=d0?'△':'✕';
-  const expo=evPctl(b.uuArr,tot.uu||0);
-  if(expo!=null){marks['露出']=expo>=0.70?'◎':expo>=0.45?'○':expo>=0.25?'△':'✕';det['露出']='上位'+Math.max(1,Math.round((1-expo)*100))+'%';}
-  const pFav=evSdiv(tot.fav,tot.pv); const pFavp=pFav!=null?pFav*100:null;
-  if(b.favrate_pv!=null&&pFavp!=null){marks['興味']=mk(pFavp/b.favrate_pv,1.15,0.90,0.70);det['興味']=pFavp.toFixed(1)+'%/基準'+b.favrate_pv.toFixed(1)+'%';}
-  const pCart=evSdiv(tot.cart,tot.uu); const pCartp=pCart!=null?pCart*100:null;
-  if(b.cartrate!=null&&pCartp!=null){marks['カート']=mk(pCartp/b.cartrate,1.10,0.85,0.60);det['カート']=pCartp.toFixed(1)+'%/基準'+b.cartrate.toFixed(1)+'%';}
-  const pCVR=evSdiv(tot.buy,tot.uu); const pCVRp=pCVR!=null?pCVR*100:null;
-  const pF2=evSdiv(tot.buy,tot.fav); const pF2p=pF2!=null?pF2*100:null;
-  let saveStuck=false;
-  if(b.cvr!=null&&pCVRp!=null){marks['転換']=mk(pCVRp/b.cvr,1.10,0.85,0.60);det['転換']=pCVRp.toFixed(2)+'%/基準'+b.cvr.toFixed(2)+'%';
-    if(b.fav2buy!=null&&pF2p!=null&&pF2p<b.fav2buy*0.55)saveStuck=true;}
-  const ipr=(p.units[L]||0)?(p.amt[L]||0)/p.units[L]:0;
-  const saleDep=p.baika>0&&ipr>0&&ipr<p.baika*0.85;
-  const so=p.so||[]; const nw=p.nweeks||so.length||1; const win=Math.min(nw,12);
-  const soRate=so.length?so.slice(-Math.max(1,win)).filter(Boolean).length/Math.min(Math.max(1,win),so.length):0;
-  const cover=p.cover, hasCover=(cover!==''&&cover!=null);
-  const demand=(tot.units||0)>=50;
-  const rec4=p.buy.slice(-4).reduce((a,x)=>a+x,0);
-  let stockState='ok';
-  if(hasCover&&cover>=180)stockState='surplus';
-  else if(hasCover&&cover<28)stockState='shortage';
-  const soNow=so.length?!!so[so.length-1]:false, ample=hasCover&&cover>=28&&!soNow;   // 今は在庫が28日分以上ある＝過去の欠品週だけで「欠品」とはしない
-  if(stockState!=='surplus'&&soRate>=0.5&&demand&&!ample)stockState='shortage';
-  if(stockState==='ok'&&soRate===0&&(tot.units||0)>0&&rec4===0&&hasCover&&cover>=180)stockState='surplus';
-  if(stockState==='surplus')marks['在庫']='✕';
-  else if(stockState==='shortage')marks['在庫']=((hasCover&&cover<28)||soRate>=0.5)?'✕':'△';
-  else if(hasCover)marks['在庫']=(soRate===0&&cover>=42&&cover<180)?'◎':(soRate<0.25&&cover>=28)?'○':(cover<42?'△':'○');
-  if(hasCover)det['在庫']=(cover===''?'—':cover+'日');
-  const hasAd=(tot.adcost||0)>0; let adState='na', roasTot=null;
-  if(hasAd){roasTot=evSdiv(tot.adrev,tot.adcost); roasTot=roasTot!=null?roasTot*100:null;
-    if(roasTot!=null){marks['広告']=roasTot>=300?'◎':roasTot>=200?'○':roasTot>=100?'△':'✕';adState=roasTot>=300?'good':roasTot<100?'bad':'ok';det['広告']='ROAS'+Math.round(roasTot)+'%';}}
-  const wu=p.wow_units||0;
-  if((p.units[L]||0)>=5){marks['モメンタム']=(wu>=40&&(p.wow_uu||0)>=0)?'◎':(wu>-15)?'○':(wu>-30)?'△':'✕';
-    if(soRate>=0.5&&marks['モメンタム']==='✕')marks['モメンタム']='○';
-    det['モメンタム']='前週比'+(wu>=0?'+':'')+wu+'%';}
-  return {marks,det,stockState,soRate,saveStuck,saleDep,hasAd,adState,pFav,pCVR};
+function evBottleneck(A) {
+  if (A.stockState === 'shortage') return { mode: '欠品', sev: 'high' };
+  if (A.stockState === 'surplus') return { mode: '余剰', sev: 'high' };
+  const order = [['露出', '露出不足'], ['興味', '刺さらない'], ['カート', 'カート離脱'], ['転換', '転換不足']];
+  const weak = order.filter(([k]) => A.marks[k] === '✕' || A.marks[k] === '△');
+  const improving = weak.filter(([k]) => A.trend[k] === 'up').map(([k]) => k);
+  const stuck = weak.filter(([k]) => A.trend[k] !== 'up');                     // 基準未満で、改善していない段
+  if (stuck.length) { const [k, m] = stuck.find(([k]) => A.marks[k] === '✕') || stuck[0]; return { stage: k, mode: m, sev: A.marks[k] === '✕' ? 'high' : 'mid', improving }; }
+  if (weak.length) return { mode: '改善中', sev: 'low', improving };
+  if (A.marks['モメンタム'] === '✕') return { mode: '失速', sev: 'mid', improving };
+  if (A.marks['広告'] === '✕') return { mode: '広告非効率', sev: 'high', improving };
+  if (A.marks['広告'] === '△') return { mode: '広告非効率', sev: 'mid', improving };
+  return { mode: '健全', sev: 'low', improving };
 }
-function evGrade(p,marks,stockState,adState){
-  const thin=p.isnew||(p.nweeks||0)<6||((p.tot&&p.tot.uu)||0)<30;
-  if(thin)return {g:'新規',hold:true,score:null};
-  const SC={'◎':100,'○':75,'△':45,'✕':15};
-  const W={'露出':0.24,'興味':0.20,'カート':0.10,'転換':0.24,'モメンタム':0.12};
-  let num=0,den=0,firstBroken=null;
-  for(const k of ['露出','興味','カート','転換','モメンタム']){const m=marks[k];if(m==null||SC[m]==null)continue;
-    num+=SC[m]*W[k];den+=W[k];if(firstBroken===null&&(m==='△'||m==='✕'))firstBroken=k;}
-  let base=den>0?num/den:50;
-  const uT=(p.tot&&p.tot.units)||0; base+=uT>=2000?8:uT>=500?4:uT<50?-8:0;
-  if(firstBroken&&['露出','興味','転換'].includes(firstBroken)&&marks[firstBroken]==='✕')base-=12;
-  if(stockState==='shortage')base=Math.max(base,55);
-  if(adState==='good')base+=5;else if(adState==='bad')base-=8;
-  if(marks['モメンタム']==='◎')base+=3;else if(marks['モメンタム']==='✕')base-=3;
-  base=Math.max(0,Math.min(100,Math.round(base)));
-  return {g:base>=82?'S':base>=68?'A':base>=52?'B':base>=36?'C':'D',score:base,bottleneck:firstBroken};
+const evMove = (A, k) => `${EV_NAME[k]} ${A.prev[k]}→${A.det[k].split('／')[0]}`;
+function evStrengths(A) {
+  const out = [];
+  ['露出', '興味', 'カート', '転換', '広告'].forEach(k => { if (A.trend[k] === 'up' && A.prev[k] != null) out.push(`${EV_NAME[k]}が前7日より改善（${A.prev[k]}→${A.det[k].split('／')[0]}）`); });
+  if (A.marks['露出'] === '◎') out.push(`PVが主力級（7日で${A.det['露出']}）`);
+  if (A.marks['興味'] === '◎') out.push(`お気に入り率${A.det['興味']}（基準6%以上）。商品力が強い`);
+  if (A.marks['転換'] === '◎') out.push(`CVR${A.det['転換']}（基準1.5%以上）。価格・サイズが揃って買われている`);
+  if (A.marks['モメンタム'] === '◎') out.push(`受注が前7日の${A.prev['モメンタム']}→${A.det['モメンタム']}に急伸`);
+  return out.slice(0, 3);
 }
-function evBottleneck(p,marks,stockState,soRate){
-  if(p.isnew||(p.nweeks||0)<6)return {mode:'判断保留',sev:'low'};
-  const demand=((p.tot&&p.tot.units)||0)>=50, hasCover=(p.cover!==''&&p.cover!=null);
-  if(stockState==='shortage'&&((soRate>=0.5&&demand)||(hasCover&&p.cover<28)))return {mode:'欠品',sev:(hasCover&&p.cover<28)?'high':'mid'};
-  if(stockState==='surplus')return {mode:'余剰',sev:'high'};
-  const order=[['露出','露出不足'],['興味','刺さらない'],['カート','カート離脱'],['転換','転換不足']];
-  for(const[k,m]of order)if(marks[k]==='✕')return {stage:k,mode:m,sev:'high'};
-  for(const[k,m]of order)if(marks[k]==='△')return {stage:k,mode:m,sev:'mid'};
-  if(marks['モメンタム']==='✕')return {mode:'失速',sev:'mid'};
-  if(marks['広告']==='✕')return {mode:'広告非効率',sev:'high'};
-  if(marks['広告']==='△')return {mode:'広告非効率',sev:'mid'};
-  return {mode:'健全',sev:'low'};
-}
-function evStrengths(p,marks,b){
-  const out=[];
-  if(marks['モメンタム']==='◎'&&(p.wow_units||0)>=40)out.push('受注 前週比+'+p.wow_units+'%で急伸中。在庫を切らさず松で仕込みランキング上位を狙う');
-  const expo=evPctl(b.uuArr,(p.tot&&p.tot.uu)||0);
-  if(marks['露出']==='◎'&&expo!=null)out.push('露出が強い（カテゴリ上位'+Math.max(1,Math.round((1-expo)*100))+'%）。掲載/ランキングが効いている、順位維持を');
-  const pFav=evSdiv(p.tot.fav,p.tot.pv);
-  if(marks['興味']==='◎'&&b.favrate_pv&&pFav!=null)out.push('お気に入り率がカテゴリ平均の'+(pFav*100/b.favrate_pv).toFixed(1)+'倍。商品力が強い、露出を足せば伸びしろ大');
-  if(marks['カート']==='◎')out.push('カート率が高く購入意欲が強い。在庫を厚くして取りこぼし防止');
-  const pCVR=evSdiv(p.tot.buy,p.tot.uu);
-  if(marks['転換']==='◎'&&b.cvr&&pCVR!=null)out.push('CVRがカテゴリ平均の'+(pCVR*100/b.cvr).toFixed(1)+'倍。価格・サイズ・レビューが揃い刈り取れている');
-  const rt=(p.tot&&p.tot.adcost)?p.tot.adrev/p.tot.adcost*100:0;
-  if(rt>=300)out.push('広告ROAS'+Math.round(rt)+'%と高効率。予算増額で伸ばせる');
-  if(((p.tot&&p.tot.units)||0)>=2000)out.push('通算'+p.tot.units.toLocaleString()+'枚の主力実績。安定した地力');
-  return out.slice(0,2);
+function evWarns(A) {
+  return ['露出', '興味', 'カート', '転換', '広告'].filter(k => A.trend[k] === 'down' && A.prev[k] != null)
+    .map(k => `${EV_NAME[k]}が前7日より悪化（${A.prev[k]}→${A.det[k].split('／')[0]}）`);
 }
 const EV_COPY={
-'露出不足':{high:'UUがカテゴリ下位1/4で露出が根本課題。ランキング掲載枠（カテゴリ/新着）への露出を最優先し、1枚目サムネを競合上位の構図に差し替え。TS（タイムセール）登録で初速を作りランキングの雪だるまを起こす。',mid:'露出がカテゴリ中位以下。特集・ピックアップ枠への申請とTS登録でセール面回遊への露出を作る。1枚目画像のトンマナを売れ筋競合に寄せてクリック率を底上げ。'},
-'刺さらない':{high:'見られているがお気に入り率がカテゴリ比で大幅に低く第一印象で刺さっていない。1〜3枚目画像を刷新（着用/素材アップ/カラバリ明示）、上代が高いなら発売時クーポンや価格再検討で価格印象を調整、レビュー0なら初回レビュー獲得施策を実施。',mid:'興味段がやや弱い。ディテール訴求カット（袖/丈/透け感）とコーデ提案を追加し着回しを可視化。魅力の高い色をサムネ先頭に。PR/インフルエンサーで使用イメージを供給。'},
-'カート離脱':{high:'お気に入りは付くのにカート投入が弱く、サイズ迷い/在庫欠け/価格ためらいの疑い。サイズ表・実寸・着用スタッフ身長を拡充し欠けサイズを再入荷。お気に入り登録者向けクーポンやTS価格で最後の一押しを用意。',mid:'カート率がカテゴリ基準割れ。人気サイズを厚めに補充しレビューのサイズ感コメントを目立たせる。価格が理由なら期間限定クーポンでハードルを下げる。'},
-'転換不足':{high:'UU・お気に入りは十分だがCVRがカテゴリ比で低く最終購入で失速。レビュー獲得を集中施策化、サイズ欠けは即補充、プロパー比割高ならクーポン→通常価格で値付け適正化、購入者向けリピートクーポンで刈り取る。',mid:'転換がカテゴリ平均以下。値付けを近似競合（Musinsa/NUGU同型）と照合、サイズ/カラー別在庫の欠けをチェック、レビュー・Q&A拡充で購入不安を下げる。'},
-'保存止まり':{high:'お気に入りは多いが購入に転換しない（保存止まり）。再入荷/セール開始の通知を配信し、TS登録＋クーポンで登録者の背中を押す。欠品で待たせているなら予約設定を有効化して需要を確保する。'},
-'欠品':{high:'欠品週が半数以上で機会損失が発生中（需要はある）。人気サイズ/カラーを優先に再入荷発注（松シナリオ）、LT28日を見込み早期手配。入荷まで予約設定を有効化し離脱需要をバックログ確保、在庫復活バナー・再入荷通知で溜まった需要を一気に刈り取る。',mid:'一部週で欠品/サイズ欠けにより頭打ち。欠けサイズのスポット補充とサイズ欠け表示で他サイズへ誘導。カバー28日未満なら要即発注として発注リストに載せる。'},
-'余剰':{high:'在庫カバー日数が過大（180日超）で滞留。段階値下げ（登録者クーポン→TS価格→大型セール）で計画的に消化し、コーデ特集/クロスセルで露出を作る。売れ筋色サイズを先頭に出しキャッシュ化を優先、追加発注は停止。',mid:'在庫がやや余剰気味。特集掲載・まとめ買いクーポン・関連バンドルで回転を上げ、動きが鈍い色サイズから優先値引き。追加発注は当面停止。'},
-'広告非効率':{high:'ZOZOAD ROASが損益分岐（約200%）を割り広告赤字。低ROAS面の入札を停止し、CTRの低いサムネと商品ページ（画像・レビュー）を改善してから再開。予算は高ROAS品番へ振り替える。',mid:'ROASが薄利圏（100〜200%）。入札面別にROASを分解し低い面を停止、CPC高ければ除外KWとサムネ改善でCTR向上。広告経由率が高すぎる場合は自然流入強化を併走。'},
-'失速':{high:'受注が前週比で大幅減の失速（欠品起因を除く）。原因（欠品/ランキング落ち/競合セール/トレンド一巡）を特定し、順位低下ならTS/広告で露出を再点火。トレンド鈍化なら在庫を絞り追加発注は梅で抑制、消化モードへ。',mid:'モメンタム鈍化。次回TS登録を前倒しし、お気に入り登録者へクーポン通知でリエンゲージして需要を再点火。'},
-'急騰':{mid:'勢いが出ている。売れ筋サイズの在庫を厚めに保ちつつ次回TSへ登録し、バズ予兆として発注シナリオを一段引き上げるか検討する。'},
-'セール依存':{mid:'転換はあるがセール価格に依存し薄利。プロパーでの反応をクーポン→通常価格の導線で確認し、粗利率（手数料37%＋広告費＋下代）を踏まえTS依存から脱却できる価格を探る。'}
+'露出不足':{high:'PVが週300未満で、見られていないことが根本課題。ランキング掲載枠（カテゴリ/新着）への露出を最優先し、1枚目サムネを競合上位の構図に差し替え。TS（タイムセール）登録で初速を作りランキングの雪だるまを起こす。',mid:'PVが週1,000未満（売り場に立つ最低ライン未満）。特集・ピックアップ枠への申請とTS登録でセール面回遊への露出を作る。1枚目画像のトンマナを売れ筋競合に寄せてクリック率を底上げ。'},
+'刺さらない':{high:'見られているがお気に入り率が3%未満で、第一印象で刺さっていない。1〜3枚目画像を刷新（着用/素材アップ/カラバリ明示）、上代が高いなら発売時クーポンや価格再検討で価格印象を調整、レビュー0なら初回レビュー獲得施策を実施。',mid:'お気に入り率が3〜4%でやや弱い。ディテール訴求カット（袖/丈/透け感）とコーデ提案を追加し着回しを可視化。魅力の高い色をサムネ先頭に。PR/インフルエンサーで使用イメージを供給。'},
+'カート離脱':{high:'お気に入りは付くのにカート投入がブランド平均を大きく下回り、サイズ迷い/在庫欠け/価格ためらいの疑い。サイズ表・実寸・着用スタッフ身長を拡充し欠けサイズを再入荷。お気に入り登録者向けクーポンやTS価格で最後の一押しを用意。',mid:'カート率がブランド平均を下回る。人気サイズを厚めに補充しレビューのサイズ感コメントを目立たせる。価格が理由なら期間限定クーポンでハードルを下げる。'},
+'転換不足':{high:'見られて好かれているのにCVRが1.0%未満で、最終購入で失速。レビュー獲得を集中施策化、サイズ欠けは即補充、プロパー比割高ならクーポン→通常価格で値付け適正化、購入者向けリピートクーポンで刈り取る。',mid:'CVRが1.0〜1.5%で基準（1.5%）に届かない。値付けを近似競合と照合、サイズ/カラー別在庫の欠けをチェック、レビュー・Q&A拡充で購入不安を下げる。'},
+'保存止まり':{high:'お気に入りは付くのに購入に進まない（保存止まり）。再入荷/セール開始の通知を配信し、TS登録＋クーポンで登録者の背中を押す。欠品で待たせているなら予約設定を有効化して需要を確保する。'},
+'欠品':{high:'在庫が28日分を切っている（またはZOZOで欠品中）。人気サイズ/カラーを優先に再入荷発注、LT28日を見込み早期手配。入荷まで予約設定を有効化して需要を確保し、在庫復活バナー・再入荷通知で溜まった需要を刈り取る。'},
+'余剰':{high:'在庫が180日分以上あり滞留。段階値下げ（登録者クーポン→TS価格→大型セール）で計画的に消化し、コーデ特集/クロスセルで露出を作る。売れ筋色サイズを先頭に出しキャッシュ化を優先、追加発注は停止。',mid:'在庫がやや余剰気味。特集掲載・まとめ買いクーポン・関連バンドルで回転を上げ、動きが鈍い色サイズから優先値引き。'},
+'広告非効率':{high:'ROASが100%を割り広告赤字。低ROAS面の入札を停止し、CTRの低いサムネと商品ページ（画像・レビュー）を改善してから再開。予算は高ROAS品番へ振り替える。',mid:'ROASが薄利圏（100〜200%）。入札面別にROASを分解し低い面を停止、CPC高ければサムネ改善でCTR向上。'},
+'失速':{mid:'受注が前7日から3割以上減った（欠品起因を除く）。ランキング落ち・競合セール・トレンド一巡のどれかを確認し、順位低下ならTS/広告で露出を再点火。'},
+'急騰':{mid:'勢いが出ている。売れ筋サイズの在庫を厚めに保ちつつ次回TSへ登録し、発注シナリオを一段引き上げるか検討する。'},
+'セール依存':{mid:'売れているのはプロパーより15%以上安い価格。粗利（手数料37%＋広告費＋下代）を踏まえ、クーポン→通常価格の導線でプロパーの反応も確認する。'}
 };
 const EV_GK = { 'S': 'S', 'A': 'A', 'B': 'B', 'C': 'C', 'D': 'D', '新規': 'N' };
-const EV_MCLS = { '欠品': 'm-so', '余剰': 'm-sur', '広告非効率': 'm-ad', '健全': 'm-ok', '判断保留': 'm-hold' };
+const EV_MCLS = { '欠品': 'm-so', '余剰': 'm-sur', '広告非効率': 'm-ad', '健全': 'm-ok', '改善中': 'm-ok', '判断保留': 'm-hold' };
 const _evRes = {};
 function evalOf(code) {
   if (_evRes[code] !== undefined) return _evRes[code];
-  const p = EV && EV.items[code]; if (!p) return (_evRes[code] = null);
-  const b = evBenchFor(p), A = evAnalyze(p, b), G = evGrade(p, A.marks, A.stockState, A.adState);
-  const BN = G.hold ? { mode: '判断保留', sev: 'low' } : evBottleneck(p, A.marks, A.stockState, A.soRate);
-  const ST = G.hold ? [] : evStrengths(p, A.marks, b);
+  if (!P[code]) return (_evRes[code] = null);
+  const A = evAnalyze(code), G = evGrade(A);
+  const BN = G.hold ? { mode: '判断保留', sev: 'low', improving: [] } : evBottleneck(A);
+  if (!G.hold) {
+    const cap = BN.stage ? (A.marks[BN.stage] === '✕' ? 67 : 81) : ['欠品', '余剰', '失速', '広告非効率'].includes(BN.mode) ? 81 : 100;
+    G.score = Math.min(G.score, cap); G.g = G.score >= 82 ? 'S' : G.score >= 68 ? 'A' : G.score >= 52 ? 'B' : G.score >= 36 ? 'C' : 'D';
+  }
+  const ST = G.hold ? [] : evStrengths(A), WN = G.hold ? [] : evWarns(A);
+  const impTxt = (BN.improving || []).map(k => evMove(A, k)).join('・');
   let summary;
-  if (G.hold) summary = 'データ蓄積中（発売' + (p.nweeks || 0) + '週・判定保留）';
-  else if (BN.mode === '健全') summary = '全ファネル良好。在庫を切らさず維持';
-  else if (BN.mode === '欠品') summary = '需要はあるが欠品で機会損失（買えなかった＝需要失敗ではない）';
-  else if (BN.mode === '余剰') summary = '売れる力はあるが在庫過多。消化が最優先';
-  else summary = BN.mode + 'がボトルネック';
+  if (G.hold) summary = `データが少なく判定保留（直近7日のUU ${num(A.c.uu)}）`;
+  else if (BN.mode === '健全') summary = '全段が基準以上。在庫を切らさず維持';
+  else if (BN.mode === '改善中') summary = `基準未満の段はあるが、前7日より改善中（${impTxt}）`;
+  else if (BN.mode === '欠品') summary = '需要はあるが在庫が足りない（買えなかった＝需要失敗ではない）';
+  else if (BN.mode === '余剰') summary = '在庫が多すぎる。消化が最優先';
+  else summary = `${BN.mode}がボトルネック` + (BN.stage ? `（${EV_NAME[BN.stage]} ${A.det[BN.stage].split('／')[0]}${A.trend[BN.stage] ? '・' + EV_TR[A.trend[BN.stage]][0] : ''}）` : '');
   const acts = [], bnKey = (BN.mode === '転換不足' && A.saveStuck) ? '保存止まり' : BN.mode;
   if (EV_COPY[bnKey]) acts.push(EV_COPY[bnKey][BN.sev === 'high' ? 'high' : 'mid'] || EV_COPY[bnKey].high || EV_COPY[bnKey].mid);
   if (A.saveStuck && bnKey !== '保存止まり') acts.push(EV_COPY['保存止まり'].high);
-  if (A.stockState === 'surplus' && BN.mode !== '余剰') acts.push(EV_COPY['余剰'].mid);
   if ((A.marks['広告'] === '✕' || A.marks['広告'] === '△') && BN.mode !== '広告非効率') acts.push(EV_COPY['広告非効率'].mid);
-  if (A.marks['モメンタム'] === '◎' && (p.wow_units || 0) >= 40) acts.push(EV_COPY['急騰'].mid);
+  if (A.marks['モメンタム'] === '◎') acts.push(EV_COPY['急騰'].mid);
   if (A.saleDep) acts.push(EV_COPY['セール依存'].mid);
-  return (_evRes[code] = { p, b, A, G, BN, ST, summary, acts: acts.slice(0, 3), gk: G.hold ? '新規' : G.g });
+  return (_evRes[code] = { A, G, BN, ST, WN, summary, impTxt, acts: acts.slice(0, 3), gk: G.hold ? '新規' : G.g });
 }
 function evalChip(code) {
   const E = evalOf(code); if (!E) return '';
@@ -619,29 +614,32 @@ function evalChip(code) {
 }
 function evalCard(code) {
   const E = evalOf(code); if (!E) return '';
-  const { b, A, G, BN, ST, summary, acts } = E;
-  const CH = [['露出', '露出', 'UU順位'], ['興味', '興味', 'お気に入り率（PV比）'], ['カート', 'カート', 'カート率'], ['転換', '転換', 'CVR（購入÷UU）'],
-              ['在庫', '在庫', 'カバー日数'], ['広告', '広告', 'ROAS'], ['モメンタム', '勢い', '受注 前週比']];
+  const { A, G, BN, ST, WN, summary, impTxt, acts } = E;
+  const CH = [['露出', '露出', 'PV（7日）'], ['興味', '興味', 'お気に入り率'], ['カート', 'カート', 'カート率'], ['転換', '転換', 'CVR（購入÷UU）'],
+              ['在庫', '在庫', '今の在庫'], ['広告', '広告', 'ROAS（7日）'], ['モメンタム', '勢い', '受注（7日）']];
   const MK = { '◎': 'mk-a', '○': 'mk-b', '△': 'mk-c', '✕': 'mk-d' };
-  const chips = CH.map(([k, lab, metric]) => { const m = A.marks[k], na = m == null, bn = !G.hold && BN.stage === k;
-    return `<div class="evc${na ? ' na' : ''}${bn ? ' bn' : ''}"><span class="evc-l">${lab}</span><span class="evc-m">${metric}</span><span class="evc-v ${na ? 'mk-na' : MK[m]}">${na ? '―' : m}</span><span class="evc-d num">${na ? 'N/A' : (A.det[k] || '')}</span></div>`; }).join('');
-  const fix = (!G.hold && BN.mode !== '健全')
-    ? `<div class="ev-fix ${EV_MCLS[BN.mode] || 'm-bad'}"><b>▍いま直すべき：${BN.mode}</b>${acts.length ? `<p>${acts[0]}</p>` : ''}</div>`
-    : BN.mode === '健全' ? `<div class="ev-fix m-ok"><b>✔ ファネル健全。突出したボトルネックなし</b></div>` : '';
-  const lead = !G.hold && BN.mode !== '健全' && acts.length, more = lead ? acts.slice(1) : acts;
+  const chips = CH.map(([k, lab, metric]) => { const m = A.marks[k], na = m == null, bn = !G.hold && BN.stage === k, t = A.trend[k];
+    return `<div class="evc${na ? ' na' : ''}${bn ? ' bn' : ''}"><span class="evc-l">${lab}</span><span class="evc-m">${metric}</span><span class="evc-v ${na ? 'mk-na' : MK[m]}">${na ? '―' : m}</span>
+      <span class="evc-d num">${na ? (A.det[k] || '数が少なく判定なし') : (A.det[k] || '')}</span>${!na && t ? `<span class="evc-t ${EV_TR[t][1]}">${EV_TR[t][2]} ${EV_TR[t][0]}<small>（前7日 ${A.prev[k]}）</small></span>` : ''}</div>`; }).join('');
+  const fix = G.hold ? '' : BN.mode === '健全' ? `<div class="ev-fix m-ok"><b>✔ 全段が基準以上。突出したボトルネックなし</b></div>`
+    : BN.mode === '改善中' ? `<div class="ev-fix m-ok"><b>▍改善中：${impTxt}</b><p>基準にはまだ届いていないが前7日より上がっている。今の打ち手を続け、来週も上がっているか確認する。</p></div>`
+    : `<div class="ev-fix ${EV_MCLS[BN.mode] || 'm-bad'}"><b>▍いま直すべき：${BN.mode}</b>${acts.length ? `<p>${acts[0]}</p>` : ''}${BN.improving && BN.improving.length ? `<p class="ev-imp">改善中：${impTxt}</p>` : ''}</div>`;
+  const lead = !G.hold && !['健全', '改善中'].includes(BN.mode) && acts.length, more = lead ? acts.slice(1) : acts;
+  const f = i => md(DAYS[i]);
   return `<div class="panel ev evg-${EV_GK[E.gk]}"><div class="ev-grid">
     <div>
       <div class="ev-head"><span class="ev-badge">${E.gk}</span><div><div class="ev-sum">評価：${summary}</div>
-        <div class="ev-meta">${G.hold ? '判定保留' : 'スコア ' + G.score + '/100'}　｜　基準 ${b.scope}（n=${b.n}）　地力=通算・勢い=前週比（${EV.wk_last}週まで）</div></div></div>
+        <div class="ev-meta">${G.hold ? '判定保留' : 'スコア ' + G.score + '/100'}　｜　直近7日（${f(A.W7[0])}〜${f(A.W7[1])}）を基準で判定・前7日（${f(A.W0[0])}〜${f(A.W0[1])}）から±10%で改善／悪化</div></div></div>
       ${fix}
+      ${WN.length ? `<div class="ev-warn">${WN.map(t => `<span>⚠ ${t}</span>`).join('')}</div>` : ''}
       ${more.length ? `<div class="ev-h3">${lead ? 'あわせてやること' : '改善アクション'}</div><ol class="ev-acts">${more.map(a => `<li>${a}</li>`).join('')}</ol>` : ''}
     </div>
     <div>
-      <div class="ev-leg">ファネル評価：見た(露出)→気に入った(興味)→カート→買った(転換)。<b class="mk-a">◎</b>優 <b class="mk-b">○</b>良 <b class="mk-c">△</b>注意 <b class="mk-d">✕</b>課題（この品番の通算 vs 同カテゴリ平均）</div>
+      <div class="ev-leg">見た(露出)→気に入った(興味)→カート→買った(転換)。<b class="mk-a">◎</b>優 <b class="mk-b">○</b>良 <b class="mk-c">△</b>注意 <b class="mk-d">✕</b>課題（直近7日。PV 3,000/1,000/300・お気に入り率 6/4/3%・CVR 1.5/1.0%・ROAS 300/200/100%、カート率はブランド平均比）</div>
       <div class="ev-chips">${chips}</div>
       ${ST.length ? `<div class="ev-str">${ST.map(t => `<span>💪 ${t}</span>`).join('')}</div>` : ''}
     </div></div>
-    <div class="ev-note">※ ベンチはカテゴリ横断プールレート（Σ分子/Σ分母・通算）。露出はカテゴリ内UUパーセンタイル順位。単週の率は分母が小さく暴れるため地力は通算で評価。欠品週が半数以上は「買えなかった」として転換低下を減点対象外。${A.saleDep ? '　｜　転換はセール価格に依存（薄利）の可能性。' : ''}${b.scope === '全体' ? '　｜　カテゴリ標本が少なく全体基準を使用。' : ''}　｜　評価は週次の集計（${EV.wk_last}週まで）。上の「直近7日」とは期間が違います。</div>
+    <div class="ev-note">※ 上の率カードと同じ直近7日の数字で判定。7日のPV・UUが${EV_MIN}未満の段は数が少なくぶれるので判定なし。在庫は推移表のカバー日数（28日未満＝足りない・180日以上＝多すぎ）と最新週のZOZO販売可能数。${A.saleDep ? '　｜　売れている価格がプロパーより15%以上安い（セール依存）。' : ''}</div>
   </div>`;
 }
 
