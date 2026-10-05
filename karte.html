@@ -9,7 +9,7 @@
   --line:#dce2ea; --line2:#edf1f5; --grid:#e8ecf1;
   --accent:#1f497d; --accent2:#2e74b5; --accent-soft:#e7eef8;
   --good:#2e7d32; --good-bg:#e5f2e6; --warn:#a85a00; --warn-bg:#fcefd9; --crit:#c62828; --crit-bg:#fbe4e4;
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s7:#4a3aa7;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s7:#4a3aa7; --rsv:#9dc3f0;
   --shadow:0 1px 2px rgba(23,33,47,.05),0 8px 24px rgba(23,33,47,.07);
   --sans:"IBM Plex Sans","BIZ UDPGothic","Yu Gothic","Meiryo",sans-serif;
 }
@@ -20,7 +20,7 @@
     --line:#2a3542; --line2:#212b37; --grid:#243040;
     --accent:#9bbde8; --accent2:#5d9be0; --accent-soft:#1d2b3e;
     --good:#72c476; --good-bg:#1b3121; --warn:#f0a648; --warn-bg:#382911; --crit:#ef7474; --crit-bg:#3b1b1c;
-    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s7:#9085e9;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s7:#9085e9; --rsv:#2b5590;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
   }
   :root:not([data-theme="light"]) .evg-S{--gc:#c9992e} :root:not([data-theme="light"]) .m-so{--mc:#3fb6c2} :root:not([data-theme="light"]) .m-sur{--mc:#b48ad8}
@@ -34,7 +34,7 @@
   --line:#2a3542; --line2:#212b37; --grid:#243040;
   --accent:#9bbde8; --accent2:#5d9be0; --accent-soft:#1d2b3e;
   --good:#72c476; --good-bg:#1b3121; --warn:#f0a648; --warn-bg:#382911; --crit:#ef7474; --crit-bg:#3b1b1c;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s7:#9085e9;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s7:#9085e9; --rsv:#2b5590;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
 }
 *{box-sizing:border-box}
@@ -312,6 +312,8 @@ function chart(host, o) {
   const W = Math.max(o.minW || 320, host.clientWidth), H = o.h || 140, L = o.bare ? 2 : 56, R = o.bare ? 2 : 16, T = o.bare ? 2 : o.events ? 22 : 10, B = o.bare ? 2 : o.xaxis === false ? 6 : 22;
   const iw = W - L - R, ih = H - T - B, bs = o.buckets, n = bs.length, band = iw / Math.max(n, 1);
   let vals = []; o.series.forEach(s => { if (s.noScale) return; s.values.forEach(v => { if (v != null && isFinite(v)) vals.push(v); }); });
+  const stk = o.series.filter(s => s.stack); if (stk.length) bs.forEach((_, i) => vals.push(stk.reduce((t, s) => t + (s.values[i] > 0 ? s.values[i] : 0), 0)));
+  const base = new Array(n).fill(0), nbar = o.series.filter(x => x.type === 'bar' && !x.stack).length;
   if (!vals.length) { host.innerHTML = `<div class="foot" style="padding:${o.bare ? 0 : 10}px 0">${o.bare ? '—' : 'この期間はデータがありません'}</div>`; const stub = { setHover() {} }; if (o.group) o.group.push(stub); return stub; }
   (o.refs || []).forEach(r => vals.push(r.v));
   let lo = o.zero === false && vals.length ? Math.min(...vals) : 0, hi = vals.length ? Math.max(...vals) : 1;
@@ -329,9 +331,10 @@ function chart(host, o) {
     g += `<text x="${W - R}" y="${Y(r.v) - 4}" text-anchor="end" font-size="10.5" fill="var(--muted)">${r.label}</text>`; });
   o.series.forEach((s, si) => {
     if (s.type === 'bar') {
-      const bw = Math.max(1.5, Math.min(22, band * .66)), off = o.series.filter(x => x.type === 'bar').length > 1 ? (si === 0 ? -bw / 4 : bw / 4) : 0;
-      s.values.forEach((v, i) => { if (v == null || v <= 0) return; const y = Y(v), h = Y(y0) - y;
-        g += `<rect x="${X(i) - bw / 2 + off}" y="${y}" width="${bw}" height="${Math.max(h, .5)}" rx="${Math.min(2, bw / 3)}" fill="${s.color}"/>`; });
+      const bw = Math.max(1.5, Math.min(22, band * .66)), off = !s.stack && nbar > 1 ? (si === 0 ? -bw / 4 : bw / 4) : 0;
+      s.values.forEach((v, i) => { if (v == null || v <= 0) return; const b0 = s.stack ? base[i] : 0, y = Y(b0 + v), h = Y(y0 + b0) - y;
+        if (s.stack) base[i] += v;
+        g += `<rect x="${X(i) - bw / 2 + off}" y="${y}" width="${bw}" height="${Math.max(h, .5)}" rx="${s.stack ? 0 : Math.min(2, bw / 3)}" fill="${s.color}"/>`; });
     } else if (s.type === 'line' || s.type === 'step') {
       let d = '', prev = null;
       s.values.forEach((v, i) => {
@@ -396,6 +399,7 @@ function skuStats(pr, s, e) {
   const ke = Math.min(e, SKU_END), rows = pr.skus.map(k => {
     const u14 = sumZ(k.units, SKU_END - 13, SKU_END), wk = u14 / 2;
     return { k, stock: k.stock, units: sumZ(k.units, s, ke), fav: sumZ(k.fav, s, ke), u7: sumZ(k.units, SKU_END - 6, SKU_END), up7: sumZ(k.units, SKU_END - 13, SKU_END - 7),
+      r7: sumZ(k.resv || [], SKU_END - 6, SKU_END), rp7: sumZ(k.resv || [], SKU_END - 13, SKU_END - 7),
       f7: sumZ(k.fav, SKU_END - 6, SKU_END), fp7: sumZ(k.fav, SKU_END - 13, SKU_END - 7), weekly: wk, weeks: wk > 0 ? k.stock / wk : null };
   });
   const tu = rows.reduce((a, r) => a + r.units, 0), tf = rows.reduce((a, r) => a + r.fav, 0), ts = rows.reduce((a, r) => a + r.stock, 0);
@@ -404,6 +408,13 @@ function skuStats(pr, s, e) {
   rows.sort((a, b) => b.units - a.units || b.fav - a.fav);
   return { rows, tu, tf, ts };
 }
+// 受注の内訳：予約＝売上集計（本店＋Yahoo）の販売タイプ「予約」、通常＝受注点数（商品別実績）−予約
+const rsvB = (pr, b) => bsum(pr.resv || [], b);
+const normB = (pr, b) => { const u = bsum(pr.units, b); return u == null ? null : Math.max(0, u - (rsvB(pr, b) || 0)); };
+const unitSeries = (pr, bs) => [{ label: '通常', type: 'bar', stack: true, color: 'var(--s1)', values: bs.map(b => normB(pr, b)) },
+  { label: '予約', type: 'bar', stack: true, color: 'var(--rsv)', values: bs.map(b => rsvB(pr, b)) }];
+const RSV_LEG = () => legend([['var(--s1)', '通常'], ['var(--rsv)', `予約（売上集計・${md(DAYS[SKU_END])}まで）`]]);
+const SKU_SOON = 3, SKU_HEAVY = 12;   // SKUの在庫判定（今の在庫があと何週もつか）：3週未満＝切れそう／12週以上＝余りぎみ
 const skuName = k => (k.color || '') + (k.size ? ' / ' + k.size : '');
 const RATES = [
   { k: 'cvr', l: 'CVR', def: '購入者 ÷ UU', n: 'buyers', d: 'uu', dg: 2 },
@@ -504,7 +515,8 @@ function evAnalyze(p,b){
   let stockState='ok';
   if(hasCover&&cover>=180)stockState='surplus';
   else if(hasCover&&cover<28)stockState='shortage';
-  if(stockState!=='surplus'&&soRate>=0.5&&demand)stockState='shortage';
+  const soNow=so.length?!!so[so.length-1]:false, ample=hasCover&&cover>=28&&!soNow;   // 今は在庫が28日分以上ある＝過去の欠品週だけで「欠品」とはしない
+  if(stockState!=='surplus'&&soRate>=0.5&&demand&&!ample)stockState='shortage';
   if(stockState==='ok'&&soRate===0&&(tot.units||0)>0&&rec4===0&&hasCover&&cover>=180)stockState='surplus';
   if(stockState==='surplus')marks['在庫']='✕';
   else if(stockState==='shortage')marks['在庫']=((hasCover&&cover<28)||soRate>=0.5)?'✕':'△';
@@ -695,7 +707,7 @@ function renderOverview(v) {
     ${evalCard(state.p)}
     <div class="grid g-side">
       <div class="grid">
-        <div class="panel"><div class="ph"><h2>受注点数（週別）</h2><span class="sub">期間 ${md(DAYS[s])}〜${md(DAYS[pe])}・月曜始まり・最後の週は${md(DAYS[pe])}までの途中</span></div><div class="chart" id="ovU"></div></div>
+        <div class="panel"><div class="ph"><h2>受注点数（週別）</h2><span class="sub">期間 ${md(DAYS[s])}〜${md(DAYS[pe])}・月曜始まり・最後の週は${md(DAYS[pe])}までの途中</span></div>${RSV_LEG()}<div class="chart" id="ovU"></div></div>
         <div class="panel"><div class="ph"><h2>お気に入り登録（週別）</h2><span class="sub">商品別実績・日別は「日次」タブで</span></div><div class="chart" id="ovF"></div></div>
         <div class="panel"><div class="ph"><h2>ROAS（週別）</h2><span class="sub">広告経由の売上 ÷ 広告費・広告は${md(DAYS[ae0 >= 0 ? ae0 : N - 1])}まで</span></div>${legend([['var(--s1)', 'この品番'], ['var(--muted)', 'ブランド平均']])}<div class="chart" id="ovR"></div></div>
       </div>
@@ -709,7 +721,7 @@ function renderOverview(v) {
     </div>`;
   const bs = buckets(s, pe, 'week'), grp = [];
   tipFn = i => dayTip(pr, bs[i]).replace('<div class="foot" style="margin-top:4px">クリックで詳細</div>', '');
-  chart($('#ovU'), { id: ++CID, buckets: bs, h: 170, series: [{ label: '受注点数', type: 'bar', color: 'var(--s1)', values: bs.map(b => bsum(pr.units, b)) }], group: grp, aria: '受注点数の週別推移' });
+  chart($('#ovU'), { id: ++CID, buckets: bs, h: 170, series: unitSeries(pr, bs), group: grp, aria: '受注点数の週別推移（通常・予約）' });
   chart($('#ovF'), { id: ++CID, buckets: bs, h: 130, series: [{ label: 'お気に入り', type: 'bar', color: 'var(--s3)', values: bs.map(b => bsum(pr.fav, b)) }], group: grp, aria: 'お気に入りの週別推移' });
   const RO = RATES.find(r => r.k === 'roas'), bsA = buckets(s, ae0 >= 0 ? ae0 : N - 1, 'week');
   chart($('#ovR'), { id: ++CID, buckets: bsA, h: 140, kind: 'pct', refs: [{ v: 1, label: '100%' }], aria: 'ROASの週別推移',
@@ -724,7 +736,8 @@ function dayTip(pr, b) {
   const one = b.s === b.e, h = one ? mdw(DAYS[b.s]) : `${md(DAYS[b.s])}〜${md(DAYS[b.e])}`;
   const c = bsum(pr.ad.cost, b), r = bsum(pr.ad.rev, b), rk = bsum(pr.rank, b), pr_ = bmean(pr.price, b);
   const row = (col, l, v) => `<div class="r"><span>${col ? `<i style="background:${col}"></i>` : ''}${l}</span><span>${v}</span></div>`;
-  return `<h4>${h}</h4>` + row('var(--s1)', '受注点数', num(bsum(pr.units, b))) + row('', '受注額', yen(bsum(pr.amt, b))) + row('var(--s3)', 'お気に入り', num(bsum(pr.fav, b))) +
+  const rv = rsvB(pr, b);
+  return `<h4>${h}</h4>` + row('var(--s1)', '受注点数', num(bsum(pr.units, b))) + row('var(--rsv)', 'うち予約', b.s > SKU_END ? '未取得' : num(rv || 0)) + row('', '受注額', yen(bsum(pr.amt, b))) + row('var(--s3)', 'お気に入り', num(bsum(pr.fav, b))) +
     row('var(--s7)', 'PV', num(bsum(pr.pv, b))) + row('', '売れ値（税抜）', yen(pr_)) + row('var(--s2)', '広告費', yen(c)) + row('', 'ROAS', c ? pct(r / c, 0) : '—') +
     (rk != null ? row('', 'ランキング経由PV', num(rk)) : '') + `<div class="foot" style="margin-top:4px">クリックで詳細</div>`;
 }
@@ -769,7 +782,7 @@ function renderDaily(v) {
       <div class="ph"><h2>${wk ? '週別' : '日別'}の動き</h2>${modeSeg}</div>
       ${legend(evLegend)}
       <div class="stack">
-        <div class="row-title"><b>受注点数</b><span>期間合計 ${num(sumR(pr.units, s, e))}点・${yen(sumR(pr.amt, s, e))}</span></div><div class="chart" id="d1"></div>
+        <div class="row-title"><b>受注点数</b><span>期間合計 ${num(sumR(pr.units, s, e))}点（うち予約 ${num(sumR(pr.resv || [], s, e) || 0)}点）・${yen(sumR(pr.amt, s, e))}</span></div>${RSV_LEG()}<div class="chart" id="d1"></div>
         <div class="row-title"><b>お気に入り</b><span>期間合計 ${num(sumR(pr.fav, s, e))}</span></div><div class="chart" id="d2"></div>
         <div class="row-title"><b>PV</b><span>期間合計 ${num(sumR(pr.pv, s, e))}</span></div><div class="chart" id="d3"></div>
         <div class="row-title"><b>売れ値（税抜・その${wk ? '週の平均' : '日一番多い価格'}）</b><span>点線＝プロパー ${yen(pr.proper)}</span></div><div class="chart" id="d4"></div>
@@ -778,7 +791,7 @@ function renderDaily(v) {
   const grp = [], click = i => wk ? null : openDay(bs[i].s);
   tipFn = i => dayTip(pr, bs[i]);
   const common = { buckets: bs, group: grp, onClick: wk ? null : click };
-  chart($('#d1'), { ...common, id: ++CID, h: 150, events: evs, xaxis: false, series: [{ type: 'bar', color: 'var(--s1)', values: bs.map(b => bsum(pr.units, b)) }] });
+  chart($('#d1'), { ...common, id: ++CID, h: 150, events: evs, xaxis: false, series: unitSeries(pr, bs) });
   chart($('#d2'), { ...common, id: ++CID, h: 96, xaxis: false, series: [{ type: 'bar', color: 'var(--s3)', values: bs.map(b => bsum(pr.fav, b)) }] });
   chart($('#d3'), { ...common, id: ++CID, h: 96, xaxis: false, series: [{ type: 'line', area: true, color: 'var(--s7)', values: bs.map(b => bsum(pr.pv, b)) }] });
   chart($('#d4'), { ...common, id: ++CID, h: 96, xaxis: false, kind: 'yen', zero: false, refs: pr.proper ? [{ v: pr.proper, label: 'プロパー' }] : [], series: [{ type: 'step', color: 'var(--ink2)', values: bs.map(b => bmean(pr.price, b)) }] });
@@ -791,9 +804,9 @@ function dailyTable(pr, bs, wk) {
   const cvr = b => { const u = bsum(pr.uu, b), by = bsum(pr.buyers, b); return u ? pct(by / u, 2) : '—'; };
   const roas = b => { const c = bsum(pr.ad.cost, b), r = bsum(pr.ad.rev, b); return c ? pct(r / c, 0) : '—'; };
   const rows = [...RATES.map(r => [r.l, b => pct(rateR(pr, r, b.s, b.e), r.dg), null, CRIT[r.k] ? b => CRIT[r.k](rateR(pr, r, b.s, b.e)) : null]),
-    ['受注点数', b => num(bsum(pr.units, b)), 'sep'], ['受注額', b => yen(bsum(pr.amt, b))], ['お気に入り', b => num(bsum(pr.fav, b))],
+    ['受注点数', b => num(bsum(pr.units, b)), 'sep'], ['　うち予約', b => b.s > SKU_END ? '—' : num(rsvB(pr, b) || 0)], ['受注額', b => yen(bsum(pr.amt, b))], ['お気に入り', b => num(bsum(pr.fav, b))],
     ['PV', b => num(bsum(pr.pv, b)), null, wk ? b => (b.e - b.s >= 6 ? CRIT.pvw(bsum(pr.pv, b)) : null) : null],   // 途中の週は色を付けない ['UU', b => num(bsum(pr.uu, b))], ['売れ値', b => yen(bmean(pr.price, b))],
-    ['広告費', b => yen(bsum(pr.ad.cost, b))], ['ROAS', roas], ['ランキングPV', b => num(bsum(pr.rank, b))]];
+    ['広告の表示回数（imp）', b => num(bsum(pr.ad.imp, b))], ['広告クリック', b => num(bsum(pr.ad.click, b))], ['広告費', b => yen(bsum(pr.ad.cost, b))], ['広告経由の売上', b => yen(bsum(pr.ad.rev, b))], ['ランキングPV', b => num(bsum(pr.rank, b))]];
   const sun = b => !wk && b.d.getDay() === 0 ? ' class="sun"' : '';
   const head = `<tr><th class="stk">${wk ? '週' : '日付'}</th>${bs.map(b => `<th${sun(b)}>${wk ? b.label : md(b.d)}${wk ? '' : `<small>${DOW[b.d.getDay()]}</small>`}</th>`).join('')}</tr>`;
   const cls = (b, cf) => { const c = [!wk && b.d.getDay() === 0 ? 'sun' : '']; const x = cf && cf(b); if (x) c.push('bg-' + x[0]); const j = c.filter(Boolean).join(' '); return j ? ` class="${j}"` : ''; };
@@ -811,19 +824,25 @@ function wireDailyTable() {
 function renderSku(v) {
   const pr = P[state.p], [s, e] = range(), st = skuStats(pr, s, Math.min(e, SKU_END)), rows = st.rows;
   if (!rows.length) { v.innerHTML = '<div class="panel empty">SKUのデータがありません</div>'; return; }
-  const top = rows[0], over = rows.filter(r => r.ss - r.su > .1), short = rows.filter(r => r.su - r.ss > .1);
+  const top = rows[0], wkTxt = r => `${skuName(r.k)}（${r.weeks.toFixed(1)}週）`;
+  const out0 = rows.filter(r => r.stock === 0 && r.u7 + r.up7 > 0);
+  const soon = rows.filter(r => r.stock > 0 && r.weeks != null && r.weeks < SKU_SOON);
+  const heavy = rows.filter(r => r.stock > 0 && (r.weeks != null ? r.weeks >= SKU_HEAVY : r.stock >= 10));
   const sent = [`売れの中心は${sw(top.k.color)}<b>${skuName(top.k)}</b>（期間の売れの${Math.round(top.su * 100)}%）。`];
-  if (short.length) sent.push(`<b>${short.map(r => skuName(r.k)).join('・')}</b>は売れの割合に対して在庫が少なめです。`);
-  if (over.length) sent.push(`<b>${over.map(r => skuName(r.k)).join('・')}</b>は在庫の割合が売れより大きく、余りぎみです。`);
+  if (out0.length) sent.push(`<b>${out0.map(r => skuName(r.k)).join('・')}</b>は直近2週で売れていたのに在庫がありません。`);
+  if (soon.length) sent.push(soon.length === rows.length ? `全色、今の売れペースだと${SKU_SOON}週以内に在庫が切れます（${soon.map(wkTxt).join('・')}）。`
+    : `<b>${soon.map(wkTxt).join('・')}</b>は今の売れペースだと${SKU_SOON}週以内に切れます。`);
+  if (heavy.length) sent.push(`<b>${heavy.map(r => r.weeks != null ? wkTxt(r) : skuName(r.k) + '（直近2週売れなし・在庫' + num(r.stock) + '）').join('・')}</b>は${SKU_HEAVY}週以上もつ在庫があり、余りぎみです。`);
+  if (!out0.length && !soon.length && !heavy.length) sent.push('在庫と売れのバランスに大きな偏りはありません。');
   const bar = (x, col) => `<span class="share"><span class="num">${Math.round(x * 100)}%</span><i><b style="width:${Math.round(x * 100)}%;background:${col}"></b></i></span>`;
   v.innerHTML = `<div class="panel" style="padding-block:12px"><div class="t">${sent.join(' ')}</div><div class="foot" style="margin-top:4px">期間 ${md(DAYS[s])}〜${md(DAYS[Math.min(e, SKU_END)])}・売れ/お気に入りは${md(DAYS[SKU_END])}まで。「あと」は直近2週の売れペースで今の在庫がもつ週数。</div></div>
     <div class="panel"><div class="ph"><h2>SKU別</h2><span class="sub">行をクリックで日別の動き</span></div><div class="tw"><table>
-      <thead><tr><th class="l">カラー / サイズ</th><th class="l">SKU番号</th><th>在庫</th><th>期間の売れ</th><th>直近7日</th><th>お気に入り</th><th>売れの割合</th><th>お気に入りの割合</th><th>在庫の割合</th><th>あと</th><th class="l">売れの推移</th></tr></thead>
+      <thead><tr><th class="l">カラー / サイズ</th><th class="l">SKU番号</th><th>在庫</th><th>期間の売れ</th><th>直近7日</th><th>うち予約（7日）</th><th>お気に入り</th><th>売れの割合</th><th>お気に入りの割合</th><th>在庫の割合</th><th>あと</th><th class="l">売れの推移</th></tr></thead>
       <tbody>${rows.map((r, j) => `<tr class="click" data-k="${pr.skus.indexOf(r.k)}"><td class="l">${sw(r.k.color)}${skuName(r.k)}</td><td class="l code">${r.k.code}</td><td>${num(r.stock)}${r.k.reserved ? `<div class="code">取置 ${num(r.k.reserved)}</div>` : ''}</td>
-        <td>${num(r.units)}</td><td>${num(r.u7)} <span class="${r.u7 > r.up7 ? 'up' : r.u7 < r.up7 ? 'down' : 'flat'}">${r.u7 > r.up7 ? '↑' : r.u7 < r.up7 ? '↓' : '→'}</span></td><td>${num(r.fav)}</td>
+        <td>${num(r.units)}</td><td>${num(r.u7)} <span class="${r.u7 > r.up7 ? 'up' : r.u7 < r.up7 ? 'down' : 'flat'}">${r.u7 > r.up7 ? '↑' : r.u7 < r.up7 ? '↓' : '→'}</span></td><td>${r.r7 ? `<b>${num(r.r7)}</b>` : '<span class="flat">0</span>'}</td><td>${num(r.fav)}</td>
         <td>${bar(r.su, 'var(--s1)')}</td><td>${bar(r.sf, 'var(--s3)')}</td><td>${bar(r.ss, 'var(--ink2)')}</td>
         <td><span class="pill ${r.status[0]}">${r.weeks != null ? r.weeks.toFixed(1) + '週' : r.status[1]}</span></td><td class="l"><div class="chart spark" id="sp${j}" style="width:150px"></div></td></tr>`).join('')}
-      </tbody></table></div><div class="foot" style="margin-top:8px">売れ・お気に入りはZOZO（本店＋Yahoo店）、在庫は全チャネル（推移表・POP-UP取り置き除外）。在庫の割合と売れの割合の差が10ポイント以上ある色を上の文で指摘しています。</div></div>`;
+      </tbody></table></div><div class="foot" style="margin-top:8px">売れ・予約・お気に入りはZOZO（本店＋Yahoo店。予約は売上集計の販売タイプ「予約」で、売れに含まれる）、在庫は全チャネル（推移表・POP-UP取り置き除外）。上の文は「あと」（直近2週の売れペースで今の在庫がもつ週数）で判定：3週未満＝切れそう、12週以上＝余りぎみ。</div></div>`;
   tipFn = null;
   const bs = buckets(s, Math.min(e, SKU_END), 'day');
   rows.forEach((r, j) => chart($('#sp' + j), { id: ++CID, buckets: bs, h: 30, bare: true, minW: 140, series: [{ type: 'bar', color: 'var(--s1)', values: bs.map(b => bsum(r.k.units, b)) }] }));
@@ -869,18 +888,18 @@ addEventListener('keydown', ev => { if (ev.key === 'Escape') closeDrawer(); });
 function openDay(i) {
   const pr = P[state.p], A = pr.ad, d = DAYS[i], kv = arr => `<div class="kv">${arr.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('')}</div>`;
   const c = A.cost[i], r = A.rev[i];
-  const skus = pr.skus.map(k => ({ k, u: k.units[i] || 0, f: k.fav[i] || 0 })).filter(x => x.u || x.f).sort((a, b) => b.u - a.u || b.f - a.f);
+  const skus = pr.skus.map(k => ({ k, u: k.units[i] || 0, f: k.fav[i] || 0, r: (k.resv || [])[i] || 0 })).filter(x => x.u || x.f).sort((a, b) => b.u - a.u || b.f - a.f);
   openDrawer(mdw(d), `${state.p}・${pr.name.replace(/【.*?】|《.*?》/g, '').slice(0, 24)}`, `
     <div class="dsec"><h4>率（その日／直近7日／ブランド7日）</h4><table><thead><tr><th class="l"></th><th>その日</th><th>7日</th><th>ブランド</th></tr></thead><tbody>${RATES.map(r => `<tr><td class="l">${r.l}</td><td>${pct(rateR(pr, r, i, i), r.dg)}</td><td>${pct(rateR(pr, r, i - 6, i), r.dg)}</td><td>${pct(rateR(BR(pr), r, i - 6, i), r.dg)}</td></tr>`).join('')}</tbody></table></div>
     <div class="dsec"><h4>お客さんの動き（商品別実績）</h4>${kv([['PV', num(pr.pv[i])], ['UU', num(pr.uu[i])], ['お気に入り', num(pr.fav[i])], ['カート投入', num(pr.cart[i])], ['受注点数', num(pr.units[i])], ['受注額（税抜）', yen(pr.amt[i])], ['購入者', num(pr.buyers[i])], ['CVR', pr.uu[i] ? pct(pr.buyers[i] / pr.uu[i], 2) : '—']])}</div>
     <div class="dsec"><h4>価格・露出</h4>${kv([['売れ値（税抜）', yen(pr.price[i])], ['プロパー', yen(pr.proper)], ['ランキング経由PV', pr.rank[i] != null ? num(pr.rank[i]) : i > RANK_END ? 'データ未取得' : '掲載なし']])}</div>
     <div class="dsec"><h4>広告</h4>${A.imp[i] ? kv([['表示回数', num(A.imp[i])], ['クリック', num(A.click[i])], ['クリック率', pct(A.click[i] / A.imp[i], 2)], ['広告費', yen(c)], ['経由件数', num(A.cv[i])], ['経由売上', yen(r)], ['ROAS', c ? pct(r / c, 0) : '—'], ['プレミア表示', num(pr.prem[i] || 0)]]) : '<div class="foot">広告は出ていません</div>'}</div>
-    <div class="dsec"><h4>SKU別（売上集計・お気に入り日次）</h4>${i > SKU_END ? '<div class="foot">この日のSKU別データはまだありません</div>' : skus.length ? `<table><thead><tr><th class="l">カラー</th><th>売れ</th><th>お気に入り</th></tr></thead><tbody>${skus.map(x => `<tr><td class="l">${sw(x.k.color)}${skuName(x.k)}</td><td>${num(x.u)}</td><td>${num(x.f)}</td></tr>`).join('')}</tbody></table>` : '<div class="foot">この日はSKU別の売れ・お気に入りがありません</div>'}</div>`);
+    <div class="dsec"><h4>SKU別（売上集計・お気に入り日次）</h4>${i > SKU_END ? '<div class="foot">この日のSKU別データはまだありません</div>' : skus.length ? `<table><thead><tr><th class="l">カラー</th><th>売れ</th><th>うち予約</th><th>お気に入り</th></tr></thead><tbody>${skus.map(x => `<tr><td class="l">${sw(x.k.color)}${skuName(x.k)}</td><td>${num(x.u)}</td><td>${num(x.r)}</td><td>${num(x.f)}</td></tr>`).join('')}</tbody></table>` : '<div class="foot">この日はSKU別の売れ・お気に入りがありません</div>'}</div>`);
 }
 function openSku(j) {
   const pr = P[state.p], k = pr.skus[j], [s, e] = range(), ke = Math.min(e, SKU_END), st = skuStats(pr, s, ke).rows.find(r => r.k === k), bs = buckets(s, ke, 'week');
   openDrawer(skuName(k), `${k.code}${k.jan ? '・JAN ' + k.jan : ''}`, `
-    <div class="dsec"><div class="kv">${[['在庫（全チャネル）', num(k.stock)], ['POP-UP取り置き', num(k.reserved)], ['期間の売れ', num(st.units)], ['期間のお気に入り', num(st.fav)], ['直近7日の売れ', num(st.u7) + '（前7日 ' + num(st.up7) + '）'], ['直近7日のお気に入り', num(st.f7) + '（前7日 ' + num(st.fp7) + '）'], ['直近2週の売れペース', '週' + num(st.weekly, 1) + '点'], ['在庫がもつ目安', st.weeks != null ? 'あと約' + st.weeks.toFixed(1) + '週' : '—']].map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('')}</div></div>
+    <div class="dsec"><div class="kv">${[['在庫（全チャネル）', num(k.stock)], ['POP-UP取り置き', num(k.reserved)], ['期間の売れ', num(st.units)], ['期間のお気に入り', num(st.fav)], ['直近7日の売れ', num(st.u7) + '（前7日 ' + num(st.up7) + '）'], ['うち予約（直近7日）', num(st.r7) + '（前7日 ' + num(st.rp7) + '）'], ['直近7日のお気に入り', num(st.f7) + '（前7日 ' + num(st.fp7) + '）'], ['直近2週の売れペース', '週' + num(st.weekly, 1) + '点'], ['在庫がもつ目安', st.weeks != null ? 'あと約' + st.weeks.toFixed(1) + '週' : '—']].map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join('')}</div></div>
     <div class="dsec"><h4>週別の売れ</h4><div class="chart" id="dsU"></div></div>
     <div class="dsec"><h4>週別のお気に入り</h4><div class="chart" id="dsF"></div></div>
     <div class="dsec"><h4>週別</h4><table><thead><tr><th class="l">週</th><th>売れ</th><th>お気に入り</th></tr></thead><tbody>${bs.slice().reverse().map(b => `<tr><td class="l">${b.label}</td><td>${num(bsum(k.units, b))}</td><td>${num(bsum(k.fav, b))}</td></tr>`).join('')}</tbody></table></div>`,
