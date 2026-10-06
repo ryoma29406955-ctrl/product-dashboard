@@ -336,7 +336,8 @@ function showTip(ev, html) {
 const hideTip = () => { $('#tip').style.display = 'none'; };
 
 function chart(host, o) {
-  const W = Math.max(o.minW || 320, host.clientWidth), H = o.h || 140, L = o.bare ? 2 : 56, R = o.bare ? 2 : 16, T = o.bare ? 2 : o.events ? 22 : 10, B = o.bare ? 2 : o.xaxis === false ? 6 : 22;
+  const W = Math.max(o.minW || 320, host.clientWidth); if (o.scroll) host.style.width = W + 'px';
+  const H = o.h || 140, L = o.bare ? 2 : o.scroll ? 8 : 56, R = o.bare ? 2 : o.scroll ? 48 : 16,   /* 横スクロールのグラフは目盛りを右側に（最新側が見えるので） */ T = o.bare ? 2 : o.events ? 22 : 10, B = o.bare ? 2 : o.xaxis === false ? 6 : 22;
   const iw = W - L - R, ih = H - T - B, bs = o.buckets, n = bs.length, band = iw / Math.max(n, 1);
   let vals = []; o.series.forEach(s => { if (s.noScale) return; s.values.forEach(v => { if (v != null && isFinite(v)) vals.push(v); }); });
   const stk = o.series.filter(s => s.stack); if (stk.length) bs.forEach((_, i) => vals.push(stk.reduce((t, s) => t + (s.values[i] > 0 ? s.values[i] : 0), 0)));
@@ -349,9 +350,10 @@ function chart(host, o) {
   const Y = v => T + ih - (v - y0) / (y1 - y0) * ih, X = i => L + band * (i + .5);
   let g = '';
   if (!o.bare) ticks.forEach(t => { g += `<line x1="${L}" x2="${W - R}" y1="${Y(t)}" y2="${Y(t)}" stroke="var(--grid)" stroke-width="1"/>`;
-    g += `<text x="${L - 8}" y="${Y(t) + 3.5}" text-anchor="end" font-size="10.5" fill="var(--muted)" class="num">${shortFmt(t, o.kind)}</text>`; });
+    g += o.scroll ? `<text x="${W - R + 6}" y="${Y(t) + 3.5}" text-anchor="start" font-size="10.5" fill="var(--muted)" class="num">${shortFmt(t, o.kind)}</text>`
+      : `<text x="${L - 8}" y="${Y(t) + 3.5}" text-anchor="end" font-size="10.5" fill="var(--muted)" class="num">${shortFmt(t, o.kind)}</text>`; });
   if (o.xaxis !== false && !o.bare) {
-    const step = Math.max(1, Math.ceil(n / (W > 900 ? 12 : 7)));
+    const step = Math.max(1, Math.ceil(n / (o.scroll ? Math.max(7, Math.floor(W / 80)) : W > 900 ? 12 : 7)));   // 横スクロールのグラフは幅に合わせて目盛りを増やす
     bs.forEach((b, i) => { if (i % step === 0) g += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle" font-size="10.5" fill="var(--muted)">${b.label}</text>`; });
   }
   (o.refs || []).forEach(r => { g += `<line x1="${L}" x2="${W - R}" y1="${Y(r.v)}" y2="${Y(r.v)}" stroke="var(--muted)" stroke-dasharray="4 4" stroke-width="1"/>`;
@@ -989,8 +991,8 @@ function renderSku(v) {
         <td><span class="pill ${r.status[0]}">${r.weeks != null ? r.weeks.toFixed(1) + '週' : r.status[1]}</span></td><td class="l"><div class="chart spark" id="sp${j}" style="width:150px"></div></td></tr>`).join('')}
       </tbody></table></div><div class="foot" style="margin-top:8px">売れ・予約・お気に入りはZOZO（本店＋Yahoo店。予約は売上集計の販売タイプ「予約」で、売れに含まれる）、在庫は全チャネル（推移表・POP-UP取り置き除外）。上の文は「あと」（直近2週の売れペースで今の在庫がもつ週数）で判定：3週未満＝切れそう、12週以上＝余りぎみ。</div></div>
     <div class="panel"><div class="ph"><h2>SKU別の推移</h2><div class="seg sm" id="skuMode">${[['units', '売れ'], ['fav', 'お気に入り']].map(([k, l]) => `<button aria-pressed="${state.skuMode === k}" data-v="${k}">${l}</button>`).join('')}</div></div>
-      <div class="foot" style="margin:-4px 0 6px">${state.gran === 'week' ? '週別（月曜始まり）' : '日別'}・${md(DAYS[s])}〜${md(DAYS[Math.min(e, SKU_END)])}・棒はSKUごとの積み上げ（下ほどよく売れている色）。粒度は右上の「日／週」で切り替え</div>
-      <div id="skuLeg"></div><div class="chart" id="skuStack"></div>
+      <div class="foot" style="margin:-4px 0 6px">${state.gran === 'week' ? '週別（月曜始まり）' : '日別'}・${md(DAYS[s])}〜${md(DAYS[Math.min(e, SKU_END)])}・棒はSKUごとの積み上げ（下ほどよく売れている色）。グラフも表も横スクロールで過去へ。粒度は右上の「日／週」で切り替え</div>
+      <div id="skuLeg"></div><div class="tw" id="skuStackWrap"><div class="chart" id="skuStack"></div></div>
       <details id="skuDet" ${state.skuTblOpen ? 'open' : ''} style="margin-top:8px"><summary>表で見る（色が濃いほど多い）</summary><div class="tw" id="skuTbl"></div></details>
     </div>`;
   tipFn = null;
@@ -999,12 +1001,12 @@ function renderSku(v) {
   // SKU別の推移
   const wk = state.gran === 'week', key = state.skuMode, tb = buckets(s, Math.min(e, SKU_END), state.gran), cols = skuColors(rows);
   $('#skuLeg').innerHTML = legend(rows.map((r, j) => [cols[j], skuName(r.k)]));
-  chart($('#skuStack'), { id: ++CID, buckets: tb, h: 200, aria: 'SKU別の' + (key === 'units' ? '売れ' : 'お気に入り') + 'の推移',
+  chart($('#skuStack'), { id: ++CID, buckets: tb, h: 200, scroll: true, minW: tb.length * (wk ? 56 : 20) + 72, aria: 'SKU別の' + (key === 'units' ? '売れ' : 'お気に入り') + 'の推移',
     tip: i => { const b = tb[i], items = rows.map((r, j) => [cols[j], skuName(r.k), bsum(r.k[key], b) || 0]).filter(x => x[2]).sort((a, c) => c[2] - a[2]);
       return `<h4>${wk ? b.label : mdw(b.d)}</h4>` + (items.length ? items.map(([c, n, v]) => `<div class="r"><span><i style="background:${c}"></i>${n}</span><span>${num(v)}</span></div>`).join('') + `<div class="r"><span><b>合計</b></span><span><b>${num(items.reduce((a, x) => a + x[2], 0))}</b></span></div>` : '<div class="foot">なし</div>'); },
     series: rows.map((r, j) => ({ type: 'bar', stack: true, color: cols[j], stroke: isLight(cols[j]) ? 'var(--muted)' : null, values: tb.map(b => bsum(r.k[key], b) || 0) })) });
   $('#skuTbl').innerHTML = skuTrendTable(pr, rows, cols, tb, key, wk);
-  requestAnimationFrame(() => { const t = $('#skuTbl'); if (t) t.scrollLeft = t.scrollWidth; });
+  requestAnimationFrame(() => { ['#skuTbl', '#skuStackWrap'].forEach(id => { const t = $(id); if (t) t.scrollLeft = t.scrollWidth; }); });
   $('#skuDet').addEventListener('toggle', () => { state.skuTblOpen = $('#skuDet').open; });
   document.querySelectorAll('#skuMode button').forEach(b => b.onclick = () => { state.skuMode = b.dataset.v; renderAll(); });
   document.querySelectorAll('tr[data-k]').forEach(t => t.onclick = () => openSku(+t.dataset.k));
