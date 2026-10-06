@@ -145,6 +145,8 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent2);o
 .ev-warn{display:flex;flex-direction:column;gap:5px;margin-top:10px}
 .ev-warn span{background:var(--crit-bg);color:var(--crit);border-radius:7px;padding:5px 10px;font-size:12px;line-height:1.5}
 .rv-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.kpis.yk{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:1100px){.kpis.yk{grid-template-columns:repeat(3,1fr)}}
 .rv-box{border:1px solid var(--line2);border-radius:10px;padding:10px 12px;background:var(--panel2);min-width:0}
 .rv h3{font-size:11.5px;color:var(--muted);font-weight:600;margin:0 0 6px;letter-spacing:.03em}
 .rv-t{margin:4px 0;font-size:12.5px;line-height:1.6}
@@ -273,7 +275,16 @@ const D = window.KARTE_DATA;
 if (!D) document.body.innerHTML = '<p style="padding:24px">カルテのデータ（karte_data.js）が見つかりません。商品ステータスと同じフォルダに置いてください。</p>';
 const EMBED = window.parent !== window;   // 商品ステータスの「商品カルテ」タブの中で開かれている
 const $ = s => document.querySelector(s);
-const P = D.products, KEYS = D.order || Object.keys(P);
+const P = {}, KEYS = D ? (D.order || Object.keys(D.names)) : [];   // P＝読み込んだ品番の日次データ（karte_d/品番.js を開いた時に読む）
+const _kdWait = {};
+window.KD = (h, obj) => { P[h] = obj; (_kdWait[h] || []).forEach(f => f()); delete _kdWait[h]; };
+function loadP(h, cb) {
+  if (P[h]) return cb();
+  const first = !_kdWait[h]; (_kdWait[h] = _kdWait[h] || []).push(cb); if (!first) return;
+  const s = document.createElement('script'); s.src = 'karte_d/' + encodeURIComponent(h) + '.js';
+  s.onerror = () => { delete _kdWait[h]; const v = document.getElementById('view'); if (v) v.innerHTML = '<div class="panel empty">この品番のデータ（karte_d/' + h + '.js）が見つかりません</div>'; };
+  document.head.appendChild(s);
+}
 const DAYS = D.days.map(s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); });
 const N = DAYS.length, DOW = '日月火水木金土';
 const idxOf = s => D.days.indexOf(s);
@@ -292,7 +303,7 @@ function meanR(a, s, e) { let t = 0, n = 0; for (let i = Math.max(0, s); i <= e;
 const SWATCH = { 'ブルー': '#4f7fbf', 'ライトグレー': '#cfd3d8', 'グレー': '#8f949a', 'ピンク': '#e8aebd', 'ネイビー': '#2a3a5e', 'ブラウン': '#7b563b',
   'レッド': '#b8403e', 'チャコールグレー': '#4b4f55', 'オフホワイト': '#efece4', 'ライトブルー': '#9fc0e2', 'ピスタチオ': '#b5c98e', 'ライトパープル': '#b7a6d6', 'ベージュ': '#d9c6a5', 'アイボリー': '#efe8d6', 'ブラック': '#222428', 'ホワイト': '#f7f7f5', 'グリーン': '#4f7a4a', 'イエロー': '#e2c04c', 'オレンジ': '#e08a3c' };
 
-const hashP = () => { const h = decodeURIComponent(location.hash.slice(1)); return P[h] ? h : null; };
+const hashP = () => { const h = decodeURIComponent(location.hash.slice(1)); return D && D.names[h] ? h : null; };
 const state = { span: '7d', p: hashP() || KEYS[0], tab: 'overview', period: '60', gran: 'day', tableOpen: true, dmode: 'rate', skuMode: 'units', skuTblOpen: true };
 const TABS = [['overview', '概要', '今どうなっているか'], ['daily', '日次', 'いつ何が動いたか'], ['sku', 'SKU', 'どの色が売れて、どれが切れるか'], ['ad', '広告', '広告は回収できているか']];
 
@@ -489,7 +500,7 @@ function renderChrome() {
   $('#asof').textContent = `データ：商品別実績 ${a['商品別実績'].slice(5).replace('-', '/')}まで・売れ/お気に入り ${a['売上集計'].slice(5).replace('-', '/')}まで・広告 ${a['広告'].slice(5).replace('-', '/')}まで・ランキング ${a['ランキング'].slice(5).replace('-', '/')}まで・在庫 ${a['在庫'].replace('売上推移表', '推移表').replace('.xlsx', '')}`;
   if (EMBED) $('#picker').hidden = true;
   else {
-    $('#picker').innerHTML = `<button class="navbtn" id="prevP" aria-label="前の品番">◀</button><select id="pSel" aria-label="品番" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);max-width:min(520px,100%)">${KEYS.map(k => `<option value="${k}" ${k === state.p ? 'selected' : ''}>${k}・${P[k].brand}・${P[k].name.replace(/【.*?】|《.*?》/g, '').slice(0, 30)}</option>`).join('')}</select><button class="navbtn" id="nextP" aria-label="次の品番">▶</button>`;
+    $('#picker').innerHTML = `<button class="navbtn" id="prevP" aria-label="前の品番">◀</button><select id="pSel" aria-label="品番" style="font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);max-width:min(520px,100%)">${KEYS.map(k => `<option value="${k}" ${k === state.p ? 'selected' : ''}>${k}・${D.names[k][1]}・${D.names[k][0].replace(/【.*?】|《.*?》/g, '').slice(0, 30)}</option>`).join('')}</select><button class="navbtn" id="nextP" aria-label="次の品番">▶</button>`;
     $('#pSel').onchange = e => go(e.target.value);
     $('#prevP').onclick = () => step(-1); $('#nextP').onclick = () => step(1);
   }
@@ -502,7 +513,7 @@ function renderChrome() {
   if ($('#evChip')) $('#evChip').onclick = () => { state.tab = 'overview'; renderAll(); };
   $('#tabs').innerHTML = TABS.map(([k, l, s]) => `<button class="tab" role="tab" aria-selected="${k === state.tab}" data-t="${k}">${l}<small>${s}</small></button>`).join('');
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => { state.tab = b.dataset.t; renderAll(); });
-  $('#segPeriod').innerHTML = [['30', '30日'], ['60', '60日'], ['all', '全期間']].map(([k, l]) => `<button aria-pressed="${state.period === k}" data-v="${k}">${l}</button>`).join('');
+  $('#segPeriod').innerHTML = [['30', '30日'], ['60', '60日'], ['365', '1年'], ['all', '全期間']].map(([k, l]) => `<button aria-pressed="${state.period === k}" data-v="${k}">${l}</button>`).join('');
   document.querySelectorAll('#segPeriod button').forEach(b => b.onclick = () => { state.period = b.dataset.v; renderAll(); });
   const granOff = state.tab === 'overview';
   $('#segGran').innerHTML = [['day', '日'], ['week', '週']].map(([k, l]) => `<button aria-pressed="${state.gran === k}" data-v="${k}" ${granOff ? 'disabled title="日次・SKU・広告タブで使えます"' : ''}>${l}</button>`).join('');
@@ -773,6 +784,51 @@ function reviewCard(code) {
   </div>`;
 }
 
+/* ---------- 去年との比較（週次の履歴） ---------- */
+const YOY_K = [['units', '受注点数'], ['amt', '受注額'], ['pv', 'PV'], ['fav', 'お気に入り']];
+const ymdD = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+function yoyCard(code) {
+  const pr = P[code], H = pr.hist, WK = D.hweeks; if (!H || !WK) return '';
+  const nW = WK.length, cur = nW - 1, last = D.hlastDays < 7 ? cur - 1 : cur;   // last＝7日そろった最新の週
+  const sum = (k, a, b) => { let t = 0; for (let i = Math.max(0, a); i <= Math.min(nW - 1, b); i++) t += H[k][i] || 0; return t; };
+  const wkD = i => { const d = ymdD(WK[0]); d.setDate(d.getDate() + 7 * i); return d; };
+  const L = last - 52;
+  if (L - 3 < 0 || sum('uu', L - 3, L + 8) === 0)
+    return `<div class="panel yoy"><div class="ph"><h2>去年との比較</h2></div><p class="rv-s">去年の同じ時期（${md(wkD(Math.max(0, L)))}週ごろ）はまだ売っていないか、データがありません（商品別実績は${md(ymdD(WK[0]))}週から）。</p></div>`;
+  const A = [last - 3, last], B = [L - 3, L], S = (k, r) => sum(k, r[0], r[1]);
+  const tiles = [['受注点数', S('units', A), S('units', B), v => num(v)], ['受注額', S('amt', A), S('amt', B), v => yen(v)], ['PV', S('pv', A), S('pv', B), v => num(v)],
+    ['CVR', S('uu', A) ? S('buyers', A) / S('uu', A) : null, S('uu', B) ? S('buyers', B) / S('uu', B) : null, v => pct(v, 2)],
+    ['お気に入り率', S('pv', A) ? S('fav', A) / S('pv', A) : null, S('pv', B) ? S('fav', B) / S('pv', B) : null, v => pct(v, 1)]];
+  const lyOn = S('uu', B) > 0;   // 去年の同じ4週に売っていたか
+  const tile = ([l, a, b, f]) => { const r = lyOn && a != null && b ? a / b - 1 : null;
+    return `<div class="kpi"><span class="l">${l}・直近4週</span><span class="v num">${f(a)}</span><span class="d num ${r == null ? 'flat' : r >= 0 ? 'up' : 'down'}">${lyOn ? `去年 ${f(b)}${r == null ? '' : `（${r >= 0 ? '+' : ''}${Math.round(r * 100)}%）`}` : '去年の同じ時期は発売前'}</span></div>`; };
+  const nextLY = sum('units', L + 1, L + 8), ly4 = S('units', B), ty4 = S('units', A);
+  const ratio = ly4 ? (nextLY / 8) / (ly4 / 4) : null;
+  let fl = -1; for (let i = Math.max(0, B[0]); i <= Math.min(nW - 1, L + 8); i++) if ((H.uu[i] || 0) > 0) { fl = i; break; }
+  const foreNew = !lyOn && fl >= 0 ? (() => { const u8 = sum('units', fl, fl + 7); return `去年のこの時期はまだ発売前（${md(wkD(fl))}週から販売）。<b>去年は発売から8週で${num(u8)}点</b>（週平均${num(u8 / 8, 1)}点）。今年の直近4週は週平均${num(ty4 / 4, 1)}点。`; })() : '';
+  const fore = !lyOn ? foreNew : ratio != null ? `去年は同じ4週で${num(ly4)}点 → その後8週で${num(nextLY)}点（週あたりの売れは${ratio.toFixed(2)}倍に）。今年の直近4週は${num(ty4)}点なので、<b>去年と同じ動きなら次の8週は約${num(Math.round(ty4 / 4 * ratio * 8))}点</b>（週${num(ty4 / 4 * ratio, 1)}点）。` : '';
+  const key = state.yoyKey || 'units';
+  return `<div class="panel yoy"><div class="ph"><h2>去年との比較</h2><span class="sub">今年＝${md(wkD(A[0]))}〜${md(new Date(wkD(A[1]).getTime() + 6 * 864e5))}・去年＝${md(wkD(B[0]))}〜${md(new Date(wkD(B[1]).getTime() + 6 * 864e5))}（52週前の同じ曜日）</span></div>
+    <div class="kpis small yk">${tiles.map(tile).join('')}</div>
+    ${fore ? `<p class="rv-t" style="margin-top:10px">${fore}</p>` : ''}
+    <div class="ph" style="margin-top:10px"><h2 style="font-size:12.5px">週別（棒＝今年・点線＝去年の同じ週。点線は8週先まで）</h2><div class="seg sm" id="yoyKey">${YOY_K.map(([k, l]) => `<button aria-pressed="${key === k}" data-v="${k}">${l}</button>`).join('')}</div></div>
+    ${legend([['var(--s1)', '今年'], ['var(--s2)', '去年（52週前）']])}<div class="chart" id="yoyC"></div>
+    <p class="rv-s">${D.hlastDays < 7 ? `今週（${md(wkD(cur))}週）は${D.hlastDays}日分なので、比較の4週には入れていません。` : ''}週は月曜始まり。去年のデータは商品別実績（ZOZO本店）。</p></div>`;
+}
+function yoyDraw(code) {
+  const pr = P[code], H = pr.hist, WK = D.hweeks, host = $('#yoyC'); if (!H || !WK || !host) return;
+  const nW = WK.length, cur = nW - 1, last = D.hlastDays < 7 ? cur - 1 : cur, key = state.yoyKey || 'units';
+  const wkD = i => { const d = ymdD(WK[0]); d.setDate(d.getDate() + 7 * i); return d; };
+  const idx = []; for (let i = last - 11; i <= last + 8; i++) idx.push(i);
+  const bs = idx.map(i => ({ label: (i === cur ? '今週' : md(wkD(i)) + '週') }));
+  const ty = idx.map(i => i <= cur && i >= 0 ? H[key][i] : null), ly = idx.map(i => i - 52 >= 0 && i - 52 < nW ? H[key][i - 52] : null);
+  const f = key === 'amt' ? yen : v => num(v);
+  chart(host, { id: ++CID, buckets: bs, h: 170, kind: key === 'amt' ? 'yen' : undefined, aria: '去年との比較',
+    tip: j => `<h4>${md(wkD(idx[j]))}週${idx[j] === cur && D.hlastDays < 7 ? `（途中${D.hlastDays}日）` : ''}</h4><div class="r"><span><i style="background:var(--s1)"></i>今年</span><span>${ty[j] == null ? '—' : f(ty[j])}</span></div><div class="r"><span><i style="background:var(--s2)"></i>去年（${md(wkD(idx[j] - 52))}週）</span><span>${ly[j] == null ? '—' : f(ly[j])}</span></div>`,
+    series: [{ type: 'bar', color: 'var(--s1)', values: ty }, { type: 'line', color: 'var(--s2)', dash: true, values: ly }] });
+  document.querySelectorAll('#yoyKey button').forEach(b => b.onclick = () => { state.yoyKey = b.dataset.v; renderAll(); });
+}
+
 /* ---------- 概要 ---------- */
 function renderOverview(v) {
   const pr = P[state.p], [s, e] = range(), pe = lastIdx(pr.pv), w = [pe - 6, pe], wp = [pe - 13, pe - 7];
@@ -834,6 +890,7 @@ function renderOverview(v) {
     <div class="kpis rates">${rateTiles.map(rateTile).join('')}</div>
     ${evalCard(state.p)}
     ${reviewCard(state.p)}
+    ${yoyCard(state.p)}
     <div class="grid g-side">
       <div class="grid">
         <div class="panel"><div class="ph"><h2>受注点数（週別）</h2><span class="sub">期間 ${md(DAYS[s])}〜${md(DAYS[pe])}・月曜始まり・最後の週は${md(DAYS[pe])}までの途中</span></div>${RSV_LEG()}<div class="chart" id="ovU"></div></div>
@@ -851,6 +908,7 @@ function renderOverview(v) {
   const bs = buckets(s, pe, 'week'), grp = [];
   tipFn = i => dayTip(pr, bs[i]).replace('<div class="foot" style="margin-top:4px">クリックで詳細</div>', '');
   chart($('#ovU'), { id: ++CID, buckets: bs, h: 170, series: unitSeries(pr, bs), group: grp, aria: '受注点数の週別推移（通常・予約）' });
+  yoyDraw(state.p);
   chart($('#ovF'), { id: ++CID, buckets: bs, h: 130, series: [{ label: 'お気に入り', type: 'bar', color: 'var(--s3)', values: bs.map(b => bsum(pr.fav, b)) }], group: grp, aria: 'お気に入りの週別推移' });
   const RO = RATES.find(r => r.k === 'roas'), bsA = buckets(s, ae0 >= 0 ? ae0 : N - 1, 'week');
   chart($('#ovR'), { id: ++CID, buckets: bsA, h: 140, kind: 'pct', refs: [{ v: 1, label: '100%' }], aria: 'ROASの週別推移',
@@ -1073,7 +1131,7 @@ function openSku(j) {
 }
 
 /* ---------- 全体 ---------- */
-function go(h) { if (!P[h] || h === state.p) return; state.p = h; if (location.hash.slice(1) !== h) history.replaceState(null, '', '#' + h); closeDrawer && closeDrawer(); renderAll(); scrollTo(0, 0); }
+function go(h) { if (!D.names[h] || h === state.p) return; loadP(h, () => { state.p = h; if (location.hash.slice(1) !== h) history.replaceState(null, '', '#' + h); closeDrawer && closeDrawer(); renderAll(); scrollTo(0, 0); }); }
 function step(dir) { if (EMBED) parent.postMessage({ type: 'karte-nav', dir }, '*'); else go(KEYS[(KEYS.indexOf(state.p) + dir + KEYS.length) % KEYS.length]); }
 addEventListener('hashchange', () => { const h = hashP(); if (h) go(h); });
 addEventListener('message', e => { const m = e.data || {}; if (m.type === 'karte-open') go(m.h); });
@@ -1086,5 +1144,5 @@ let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(ren
 addEventListener('keydown', ev => { if (ev.target.closest('input,select,textarea') || $('#drawer').classList.contains('on')) return;
   if (ev.key === 'ArrowRight') step(1);
   if (ev.key === 'ArrowLeft') step(-1); });
-if (D) renderAll();
+if (D) loadP(state.p, renderAll);
 </script>
