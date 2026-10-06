@@ -206,7 +206,7 @@ tbody tr.click:hover{background:var(--panel2)}
 .tt.heat td{min-width:44px}
 .tt .pl{white-space:nowrap;line-height:1.35}
 .tt .pl small{color:var(--muted);margin-left:2px;font-size:10.5px}
-.tt .pl.neg{color:var(--crit)}
+.tt .pl.neg,.tt .neg{color:var(--crit)}
 .tt td{vertical-align:top}
 .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:0}
 .tt tbody tr:hover td{background:var(--accent-soft)}
@@ -477,6 +477,21 @@ function cpnCell(pr, b) {
   if (!a && !k) return '<span class="flat">·</span>';
   return `<div class="pl${a < 0 ? ' neg' : ''}">${a < 0 ? '−' : ''}${yen(Math.abs(a))}<small>${k}点</small></div>`;
 }
+// 利益（目安）＝受注額(税抜・商品別実績)−ZOZO手数料37%−広告費(ZOZOAD実額)−クーポン(本店分・税込÷1.1)−下代×受注点数
+const PF_FEE = 0.37;
+function profitB(pr, b) {
+  const sales = bsum(pr.amt, b); if (sales == null) return null;
+  const unit = pr.cost && pr.cost.unit; if (!unit) return null;
+  const C = D.cpn, di = s => { const [y, m, d] = s.split('-').map(Number); return Math.round((new Date(y, m - 1, d) - DAYS[0]) / 864e5); };
+  let cp = 0; if (pr.cpn && C) for (let i = Math.max(b.s, di(C.from)); i <= Math.min(b.e, di(C.to)); i++) cp += pr.cpn[2] ? pr.cpn[2][i] || 0 : 0;
+  const cost = unit * (bsum(pr.units, b) || 0), fee = sales * PF_FEE, ad = bsum(pr.ad.cost, b) || 0, cpx = cp / 1.1;
+  return { sales, fee, ad, cp: cpx, cost, gp: sales - fee - ad - cpx - cost, noCpn: C ? b.e > di(C.to) : true };
+}
+const pfCell = (pr, b, k) => { const x = profitB(pr, b); if (!x) return '—'; if (!x.sales && !x.ad) return '<span class="flat">·</span>';
+  if (k === 'rate') return x.sales ? `<span class="${x.gp < 0 ? 'neg' : ''}">${pct(x.gp / x.sales, 0)}</span>` : '—';
+  if (k === 'gp') return `<span class="${x.gp < 0 ? 'neg' : ''}">${x.gp < 0 ? '−' : ''}${yen(Math.abs(x.gp))}</span>${x.noCpn && x.sales ? '<small class="flat">*</small>' : ''}`;
+  return yen(x[k]); };
+const PF_NOTE = pr => pr.cost && pr.cost.unit ? `利益（目安）＝受注額（税抜・ZOZO本店）−ZOZO手数料37%−広告費（実額）−クーポン（本店分・税込÷1.1）−下代 ${yen(pr.cost.unit)}×受注点数。下代＝${pr.cost.yen ? `原価${num(pr.cost.genka)}円（買い付け）＋輸送450円` : `原価${num(pr.cost.genka)}元×26円×1.1（検品）＋輸送450円`}。*＝クーポン明細がまだない日（その分利益が多めに出る）。` : '原価が登録されていないので利益は出せません。';
 const CPN_NOTE = () => D.cpn ? `クーポン利用額＝クーポン明細（${D.cpn.from.slice(0, 7).replace('-', '/')}〜${D.cpn.to.slice(0, 7).replace('-', '/')}発送分）を注文日で集計。マイナスは返品。${D.cpn.to.slice(5).replace('-', '/')}より後に発送された注文はまだ入っていません。` : '';
 const skuName = k => (k.color || '') + (k.size ? ' / ' + k.size : '');
 const RATES = [
@@ -517,7 +532,7 @@ function renderChrome() {
     $('#prevP').onclick = () => step(-1); $('#nextP').onclick = () => step(1);
   }
   const pr = P[state.p], li = lastIdx(pr.price), cur = li >= 0 ? pr.price[li] : null, off = cur && pr.proper ? 1 - cur / pr.proper : null;
-  $('#phead').innerHTML = `<div><h1>${pr.name}</h1><div class="chips"><span class="chip strong">${pr.brand}</span><span class="chip num">${state.p}</span>${relChip(pr)}<span class="chip">SKU ${pr.skus.length}</span>
+  $('#phead').innerHTML = `<div><h1>${pr.name}</h1><div class="chips"><span class="chip strong">${pr.brand}</span><span class="chip num">${state.p}</span>${relChip(pr)}${pr.cost && pr.cost.unit ? `<span class="chip num" title="${pr.cost.yen ? '原価' + num(pr.cost.genka) + '円（買い付け）＋輸送450円' : '原価' + num(pr.cost.genka) + '元×26円×1.1＋輸送450円'}">下代 ${yen(pr.cost.unit)}</span>` : ''}<span class="chip">SKU ${pr.skus.length}</span>
       <span class="chip num">在庫 ${num(pr.skus.reduce((a, k) => a + k.stock, 0))}</span>${evalChip(state.p)}</div></div>
     <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
       <div><div class="foot">直近の売れ値（税抜・${li >= 0 ? md(DAYS[li]) : '—'}）</div><div class="pricebox num"><span class="big">${yen(cur)}</span>${pr.proper ? `<span class="was">${yen(pr.proper)}</span>` : ''}${off != null && off > .01 ? `<span class="off">${Math.round(off * 100)}%OFF</span>` : ''}</div></div>
@@ -959,7 +974,7 @@ function renderDaily(v) {
   const evLegend = [['var(--s2)', '値下げ（▼）'], ['var(--ink2)', '値上げ（▲）'], ['var(--s7)', 'ランキング掲載（大きさ＝経由PV）', 'circle'], ['var(--s1)', 'プレミア枠に表示']];
   if (rateMode) {
     const lg = wk ? [['var(--s1)', 'この品番（週）'], ['var(--muted)', 'ブランド平均（週）']] : [['var(--s1)', 'この品番（7日平均）'], ['var(--s1)', 'その日', 'circle'], ['var(--muted)', 'ブランド平均（7日平均）']];
-    v.innerHTML = `<details class="panel" id="dDet" ${state.tableOpen ? 'open' : ''}><summary>表で見る</summary><div class="tw" id="dTable">${dailyTable(pr, bs, wk)}</div></details>
+    v.innerHTML = `<details class="panel" id="dDet" ${state.tableOpen ? 'open' : ''}><summary>表で見る</summary><div class="tw" id="dTable">${dailyTable(pr, bs, wk)}</div><div class="foot" style="margin-top:6px">${PF_NOTE(pr)}</div></details>
     <div class="panel">
       <div class="ph"><h2>${wk ? '週別' : '日別'}の率</h2>${modeSeg}</div>
       ${legend(lg)}${legend(evLegend)}
@@ -976,7 +991,7 @@ function renderDaily(v) {
     document.querySelectorAll('#dMode button').forEach(b => b.onclick = () => { state.dmode = b.dataset.v; renderAll(); });
     wireDailyTable(); return;
   }
-  v.innerHTML = `<details class="panel" id="dDet" ${state.tableOpen ? 'open' : ''}><summary>表で見る</summary><div class="tw" id="dTable">${dailyTable(pr, bs, wk)}</div></details>
+  v.innerHTML = `<details class="panel" id="dDet" ${state.tableOpen ? 'open' : ''}><summary>表で見る</summary><div class="tw" id="dTable">${dailyTable(pr, bs, wk)}</div><div class="foot" style="margin-top:6px">${PF_NOTE(pr)}</div></details>
     <div class="panel">
       <div class="ph"><h2>${wk ? '週別' : '日別'}の動き</h2>${modeSeg}</div>
       ${legend(evLegend)}
@@ -1006,6 +1021,7 @@ function dailyTable(pr, bs, wk) {
     ['受注点数', b => num(bsum(pr.units, b)), 'sep'], ['　うち予約', b => b.s > SKU_END ? '—' : num(rsvB(pr, b) || 0)], ['受注額', b => yen(bsum(pr.amt, b))], ['お気に入り', b => num(bsum(pr.fav, b))],
     ['PV', b => num(bsum(pr.pv, b)), null, wk ? b => (b.e - b.s >= 6 ? CRIT.pvw(bsum(pr.pv, b)) : null) : null],   /* 途中の週は色を付けない */
     ['UU', b => num(bsum(pr.uu, b))], ['販売価格（税抜）', b => priceCell(pr, b)], ['クーポン利用額', b => cpnCell(pr, b)],
+    ['ZOZO手数料（37%）', b => pfCell(pr, b, 'fee')], ['原価（下代×点数）', b => pfCell(pr, b, 'cost')], ['利益（目安）', b => pfCell(pr, b, 'gp'), 'sep'], ['利益率', b => pfCell(pr, b, 'rate')],
     ['広告の表示回数（imp）', b => num(bsum(pr.ad.imp, b))], ['広告クリック', b => num(bsum(pr.ad.click, b))], ['広告費', b => yen(bsum(pr.ad.cost, b))], ['広告経由の売上', b => yen(bsum(pr.ad.rev, b))], ['ランキングPV', b => num(bsum(pr.rank, b))]];
   const sun = b => !wk && b.d.getDay() === 0 ? ' class="sun"' : '';
   const head = `<tr><th class="stk">${wk ? '週' : '日付'}</th>${bs.map(b => `<th${sun(b)}>${wk ? b.label : md(b.d)}${wk ? '' : `<small>${DOW[b.d.getDay()]}</small>`}</th>`).join('')}</tr>`;
@@ -1037,7 +1053,8 @@ function skuTrendTable(pr, rows, cols, bs, key, wk) {
     <tbody>${rows.map((r, j) => `<tr><td class="stk"><i class="dot" style="background:${cols[j]}"></i>${skuName(r.k)}</td>${vals[j].map(cell).join('')}<td><b>${num(vals[j].reduce((a, x) => a + x, 0))}</b></td></tr>`).join('')}
     <tr class="sep"><td class="stk"><b>合計</b></td>${tot.map(v => `<td><b>${num(v)}</b></td>`).join('')}<td><b>${num(tot.reduce((a, x) => a + x, 0))}</b></td></tr>
     <tr class="sep"><td class="stk">販売価格（税抜）</td>${bs.map(b => `<td${sun(b)}>${priceCell(pr, b)}</td>`).join('')}<td></td></tr>
-    <tr><td class="stk">クーポン利用額</td>${bs.map(b => `<td${sun(b)}>${cpnCell(pr, b)}</td>`).join('')}<td>${cpnCell(pr, { s: bs[0].s, e: bs[bs.length - 1].e })}</td></tr></tbody></table>`;
+    <tr><td class="stk">クーポン利用額</td>${bs.map(b => `<td${sun(b)}>${cpnCell(pr, b)}</td>`).join('')}<td>${cpnCell(pr, { s: bs[0].s, e: bs[bs.length - 1].e })}</td></tr>
+    <tr><td class="stk">利益（目安・本店）</td>${bs.map(b => `<td${sun(b)}>${pfCell(pr, b, 'gp')}</td>`).join('')}<td><b>${pfCell(pr, { s: bs[0].s, e: bs[bs.length - 1].e }, 'gp')}</b></td></tr></tbody></table>`;
 }
 function renderSku(v) {
   const pr = P[state.p], [s, e] = range(), st = skuStats(pr, s, Math.min(e, SKU_END)), rows = st.rows;
@@ -1064,7 +1081,7 @@ function renderSku(v) {
     <div class="panel"><div class="ph"><h2>SKU別の推移</h2><div class="seg sm" id="skuMode">${[['units', '売れ'], ['fav', 'お気に入り']].map(([k, l]) => `<button aria-pressed="${state.skuMode === k}" data-v="${k}">${l}</button>`).join('')}</div></div>
       <div class="foot" style="margin:-4px 0 6px">${state.gran === 'week' ? '週別（月曜始まり）' : '日別'}・${md(DAYS[s])}〜${md(DAYS[Math.min(e, SKU_END)])}・棒はSKUごとの積み上げ（下ほどよく売れている色）。グラフも表も横スクロールで過去へ。粒度は右上の「日／週」で切り替え</div>
       <div id="skuLeg"></div><div class="tw" id="skuStackWrap"><div class="chart" id="skuStack"></div></div>
-      <details id="skuDet" ${state.skuTblOpen ? 'open' : ''} style="margin-top:8px"><summary>表で見る（色が濃いほど多い）</summary><div class="tw" id="skuTbl"></div><div class="foot" style="margin-top:6px">${CPN_NOTE()}</div></details>
+      <details id="skuDet" ${state.skuTblOpen ? 'open' : ''} style="margin-top:8px"><summary>表で見る（色が濃いほど多い）</summary><div class="tw" id="skuTbl"></div><div class="foot" style="margin-top:6px">${CPN_NOTE()}<br>${PF_NOTE(pr)}</div></details>
     </div>`;
   tipFn = null;
   const bs = buckets(s, Math.min(e, SKU_END), 'day');
