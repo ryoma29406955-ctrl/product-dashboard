@@ -279,7 +279,7 @@ details summary{cursor:pointer;color:var(--accent);font-size:12.5px;padding:6px 
 </aside>
 <div class="tip" id="tip"></div>
 
-<script src="karte_data.js?v=20261009132834"></script>
+<script src="karte_data.js?v=20261009134016"></script>
 <script>
 const D = window.KARTE_DATA;
 if (!D) document.body.innerHTML = '<p style="padding:24px">カルテのデータ（karte_data.js）が見つかりません。商品ステータスと同じフォルダに置いてください。</p>';
@@ -294,7 +294,7 @@ window.KD = (h, obj) => { P[h] = toTaxIn(obj); (_kdWait[h] || []).forEach(f => f
 function loadP(h, cb) {
   if (P[h]) return cb();
   const first = !_kdWait[h]; (_kdWait[h] = _kdWait[h] || []).push(cb); if (!first) return;
-  const s = document.createElement('script'); s.src = 'karte_d/' + encodeURIComponent(h) + '.js?v=20261009132834';
+  const s = document.createElement('script'); s.src = 'karte_d/' + encodeURIComponent(h) + '.js?v=20261009134016';
   s.onerror = () => { delete _kdWait[h]; const v = document.getElementById('view'); if (v) v.innerHTML = '<div class="panel empty">この品番のデータ（karte_d/' + h + '.js）が見つかりません</div>'; };
   document.head.appendChild(s);
 }
@@ -1235,14 +1235,13 @@ function drawCtrPanel(pr, s, e) {
   else {
     const lines = actsIn.map(a => { const d = a[0], b0 = d - 7, b1 = d - 1, a1 = Math.min(d + 6, ae);
       const ib = sumR(A.imp, b0, b1) || 0, ia = sumR(A.imp, d, a1) || 0;
-      if (ib < CTR_MIN || ia < CTR_MIN) return { txt: `${md(DAYS[d])} ${a[2]}：前後の表示が少なくて比べられません` };
+      if (ib < CTR_MIN || ia < CTR_MIN) { const L = pvImgLine(pr, bR, a, ae, [...pev.map(p => p.i), ...acts.map(x => x[0])], PF); return { ...L, txt: L.txt.replace('<br>', '<br>　<small class="flat">広告の表示が少ないのでPVで比べています</small><br>') }; }
       const cb = ctrOf(pr, b0, b1), ca = ctrOf(pr, d, a1), bb = ctrOf(bR, b0, b1), ba = ctrOf(bR, d, a1);
       const own = ca / cb - 1, br = bb && ba ? ba / bb - 1 : 0, net = own - br;
       const pb = meanR(PF, b0, b1), pa = meanR(PF, d, a1), pchg = pb && pa && Math.abs(pa / pb - 1) > .03;
       const other = [...pev.map(p => p.i), ...acts.map(x => x[0])].some(i => i !== d && i >= b0 && i <= a1);
       return { net: a1 - d + 1 >= 5 ? net : null, wait: a1 - d + 1 < 5, txt: `<b>${md(DAYS[d])}</b> ${a[2]}<br>　クリック率 ${pct(cb, 2)} → ${pct(ca, 2)}（${relTxt(own)}。ブランド全体の動き ${relTxt(br)} を引くと <b>${relTxt(net)}</b>）${a1 - d + 1 < 7 ? `<small class="flat">・変えた後はまだ${a1 - d + 1}日分</small>` : ''}${pchg ? `<br>　<small class="flat">※同じ時期に売れ値も ${yen(pb)}→${yen(pa)} に変わっています</small>` : ''}${other ? `<br>　<small class="flat">※前後7日に別の変更もあります（効果が混ざります）</small>` : ''}` }; });
-    const nets = lines.filter(l => l.net != null).map(l => l.net), best = nets.length ? Math.max(...nets) : null;   // 変えた後が5日分そろったものだけで判定
-    imgPill = best == null ? (lines.some(l => l.wait) ? ['mute', '様子見（5日分そろうまで）'] : ['mute', '判定できない']) : best >= .15 ? ['good', '効いた'] : best <= -.15 ? ['crit', '下がった'] : ['mute', '変化小'];
+    imgPill = imgPillOf(lines);   // 変えた後が5日分そろったものだけで判定
     imgBody = lines.map(l => l.txt).join('<br>');
   }
   // 値段：売れ値ごとのクリック率
@@ -1271,11 +1270,88 @@ function drawCtrPanel(pr, s, e) {
   $('#ctrSum').innerHTML = `<div class="foot" style="margin:-2px 0 8px">期間 ${md(DAYS[s])}〜${md(DAYS[ae])}（広告データの最後の日まで）・クリック率 ${pct(cO, 2)}（ブランド平均 ${pct(cB, 2)}）。期間は右上の「30日／60日／1年／全期間」で変わります</div>`;
 }
 
+// 画像を変えた日の前後7日のPV（ブランド全体の動きで割って補正）。広告が無い品番・広告の表示が少ない時に使う
+function pvImgLine(pr, bR, a, ae, others, PF) {
+  const d = a[0], b0 = d - 7, b1 = d - 1, a1 = Math.min(d + 6, ae), nA = a1 - d + 1;
+  const sb = sumR(pr.pv, b0, b1) || 0, sa = sumR(pr.pv, d, a1) || 0;
+  if (sb < 30 || sa < 30 * nA / 7) return { txt: `<b>${md(DAYS[d])}</b> ${a[2]}：前後のPVが少なくて比べられません（前7日 ${num(sb)}）` };
+  const ob = sb / 7, oa = sa / nA, bb = bR ? (sumR(bR.pv, b0, b1) || 0) / 7 : 0, ba = bR ? (sumR(bR.pv, d, a1) || 0) / nA : 0;
+  const own = oa / ob - 1, br = bb && ba ? ba / bb - 1 : 0, net = (1 + own) / (1 + br) - 1;
+  const pb = meanR(PF, b0, b1), pa = meanR(PF, d, a1), pchg = pb && pa && Math.abs(pa / pb - 1) > .03, other = others.some(i => i !== d && i >= b0 && i <= a1);
+  return { net: nA >= 5 ? net : null, wait: nA < 5, txt: `<b>${md(DAYS[d])}</b> ${a[2]}<br>　PV 1日 ${num(ob, 1)} → ${num(oa, 1)}（${relTxt(own)}。ブランド全体の動き ${relTxt(br)} で割ると <b>${relTxt(net)}</b>）${nA < 7 ? `<small class="flat">・変えた後はまだ${nA}日分</small>` : ''}${pchg ? `<br>　<small class="flat">※同じ時期に売れ値も ${yen(pb)}→${yen(pa)} に変わっています</small>` : ''}${other ? `<br>　<small class="flat">※前後7日に別の変更もあります（効果が混ざります）</small>` : ''}` };
+}
+const imgPillOf = lines => { const nets = lines.filter(l => l.net != null).map(l => l.net), best = nets.length ? Math.max(...nets) : null;
+  return best == null ? (lines.some(l => l.wait) ? ['mute', '様子見（5日分そろうまで）'] : ['mute', '判定できない']) : best >= .15 ? ['good', '効いた'] : best <= -.15 ? ['crit', '下がった'] : ['mute', '変化小']; };
+/* ---------- PVの分析（広告が出ていない時。クリック率の代わり） ---------- */
+function pvPanelHTML() {
+  return `<div class="panel" id="ctrPanel"><div class="ph"><h2>PVの分析（画像・値段・商品力）</h2><span class="sub">広告が出ていないので、クリック率の代わりにPV（商品ページが見られた回数）で見ます</span></div>
+    <div id="ctrSum"></div>
+    ${legend([['var(--s7)', 'PV（直近7日の1日平均）'], ['var(--s7)', 'その日のPV', 'circle'], ['var(--muted)', 'ブランド全体の動き（この品番の平均に合わせて表示）'], ['var(--s3)', '画像を変えた日（◆）'], ['var(--s2)', '値下げ（▼）'], ['var(--ink2)', '値上げ（▲）']])}
+    <div class="chart" id="ctrC"></div><div class="chart" id="ctrP"></div>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:10px" id="ctrCards"></div>
+    <details style="margin-top:10px" open><summary>変えた日ごとの区間で比べる</summary><div class="tw" id="ctrSeg"></div></details>
+    <div class="foot" style="margin-top:6px">PVは商品別実績（ZOZO本店）。ブランド全体の動きで割るのは、セールや季節でサイト全体のPVが動く分を消すため。画像を変えた日＝商品改善ログの「記録」タブ（種類が画像・新色）と写真２のAIサムネ。</div></div>`;
+}
+function drawPvPanel(pr, s, e) {
+  const bR = BR(pr), ae = Math.min(e, lastIdx(pr.pv));
+  if (ae < s) { $('#ctrPanel').innerHTML = '<div class="foot">この期間はPVのデータがありません</div>'; return; }
+  const bd = buckets(s, ae, 'day'), PF = ffPrice(pr, ae), pe = pr.proper;
+  const k = bR ? (sumR(pr.pv, s, ae) || 0) / (sumR(bR.pv, s, ae) || 1) : 0;   // ブランドの線をこの品番の大きさに合わせる倍率
+  const p7 = (src, i) => { const v = sumR(src.pv, i - 6, i); return v == null ? null : v / 7; };
+  const own7 = bd.map(b => p7(pr, b.s)), ownD = bd.map(b => pr.pv[b.s]), br7 = bd.map(b => bR && k ? p7(bR, b.s) * k : null);
+  const acts = (pr.acts || []).filter(a => IMG_KINDS.includes(a[1])), pev = priceEvents(pr, s, ae);
+  const evs = [...pev.map(p => ({ i: p.i - s, kind: p.kind })), ...acts.filter(a => a[0] >= s && a[0] <= ae).map(a => ({ i: a[0] - s, kind: 'img' }))];
+  const grp = [], row = (l, x) => `<div class="r"><span>${l}</span><span>${x}</span></div>`;
+  const tip = i => { const d = s + i, p = PF[d], ac = acts.filter(a => a[0] === d).map(a => `<div class="foot">◆ ${a[1]}：${a[2]}</div>`).join('');
+    return `<h4>${mdw(DAYS[d])}</h4>` + row('PV（その日）', num(pr.pv[d])) + row('PV（直近7日の1日平均）', num(own7[i], 1)) + row('UU', num(pr.uu[d])) + row('売れ値', p ? `${yen(p)}${pe ? `（${Math.round((1 - p / pe) * 100)}%OFF）` : ''}` : '—') + ac; };
+  chart($('#ctrC'), { id: ++CID, buckets: bd, group: grp, h: 170, events: evs, tip, xaxis: false, aria: 'PVの推移',
+    series: [{ type: 'dots', color: 'var(--s7)', values: ownD, noScale: true }, { type: 'line', color: 'var(--s7)', values: own7 }, { type: 'line', color: 'var(--muted)', dash: true, values: br7 }] });
+  chart($('#ctrP'), { id: ++CID, buckets: bd, group: grp, h: 92, kind: 'yen', zero: false, tip, refs: pe ? [{ v: pe, label: 'プロパー' }] : [], aria: '売れ値の推移',
+    series: [{ type: 'step', color: 'var(--ink2)', values: bd.map(b => PF[b.s]) }] });
+  // 区間
+  const cps = [...new Set([...pev.map(p => p.i), ...acts.map(a => a[0])].filter(i => i > s && i <= ae))].sort((a, b) => a - b);
+  const bounds = [s, ...cps, ae + 1], shareAll = k, segs = [];
+  for (let j = 0; j < bounds.length - 1; j++) {
+    const a = bounds[j], b = bounds[j + 1] - 1, n = b - a + 1, pv = sumR(pr.pv, a, b) || 0, bp = bR ? sumR(bR.pv, a, b) || 0 : 0, pm = meanR(PF, a, b);
+    const why = [...pev.filter(p => p.i === a).map(p => `${p.kind === 'down' ? '▼値下げ' : '▲値上げ'} ${yen(p.from)}→${yen(p.to)}`), ...acts.filter(x => x[0] === a).map(x => `◆${x[1]}：${x[2]}`)].join('<br>') || (j === 0 ? '（期間のはじめ）' : '');
+    segs.push({ a, b, n, pvd: pv / n, idx: bp && shareAll ? (pv / bp) / shareAll - 1 : null, why, pm, off: pe && pm ? 1 - pm / pe : null, fav: rateR(pr, RATES[2], a, b), cvr: rateR(pr, RATES[0], a, b) });
+  }
+  $('#ctrSeg').innerHTML = `<table><thead><tr><th class="l">区間</th><th class="l">何が変わったか</th><th>売れ値（税込）</th><th>OFF</th><th>PV/日</th><th>期間平均との差（ブランド補正）</th><th>お気に入り率</th><th>CVR</th></tr></thead><tbody>${segs.map(g => `<tr><td class="l">${md(DAYS[g.a])}〜${md(DAYS[g.b])}<small class="flat">（${g.n}日）</small></td><td class="l" style="max-width:340px;white-space:normal">${g.why}</td><td>${yen(g.pm)}</td><td>${g.off != null ? Math.round(g.off * 100) + '%' : '—'}</td><td><b>${num(g.pvd, 1)}</b></td><td>${relTxt(g.idx)}</td><td>${pct(g.fav, 1)}</td><td>${pct(g.cvr, 2)}</td></tr>`).join('')}</tbody></table>`;
+  const card = (title, pill, body) => `<div class="panel" style="padding:10px 12px"><div class="ph" style="margin-bottom:4px"><h2 style="font-size:12.5px">${title}</h2>${pill ? `<span class="pill ${pill[0]}">${pill[1]}</span>` : ''}</div><div style="font-size:12.5px;line-height:1.7">${body}</div></div>`;
+  // 画像
+  const actsIn = acts.filter(a => a[0] > s && a[0] <= ae), others = [...pev.map(p => p.i), ...acts.map(x => x[0])];
+  let imgBody, imgPill = null;
+  if (!actsIn.length) imgBody = 'この期間に画像を変えた記録はありません。商品改善ログの「記録」タブに種類「画像（サムネ）」などで書くと、ここで前後を比べます。';
+  else { const lines = actsIn.map(a => pvImgLine(pr, bR, a, ae, others, PF)); imgPill = imgPillOf(lines); imgBody = lines.map(l => l.txt).join('<br>'); }
+  // 値段：売れ値ごとのPV（同じ日のブランドのPVと比べる）
+  const lv = new Map(); for (let i = s; i <= ae; i++) { const p = PF[i], v = pr.pv[i]; if (!p || v == null) continue; const key = Math.round(p / 10) * 10, x = lv.get(key) || { pv: 0, bp: 0, d: 0 }; x.pv += v; x.bp += bR ? bR.pv[i] || 0 : 0; x.d++; lv.set(key, x); }
+  const lvs = [...lv.entries()].filter(([, x]) => x.pv >= 30).sort((a, b) => a[0] - b[0]);
+  const sidx = x => x.bp && shareAll ? (x.pv / x.bp) / shareAll : null;
+  let prBody, prPill = null;
+  if (lvs.length < 2) prBody = lvs.length ? `この期間は売れ値がほぼ ${yen(lvs[0][0])} だけなので、値段との関係はまだ見られません。期間を長くすると出ることがあります。` : 'PVが少なくて見られません。';
+  else { const lo = lvs[0], hi = lvs[lvs.length - 1], il = sidx(lo[1]), ih = sidx(hi[1]), r = il && ih ? il / ih - 1 : (lo[1].pv / lo[1].d) / (hi[1].pv / hi[1].d) - 1;
+    prPill = r >= .15 ? ['good', '安いと見られる'] : r <= -.15 ? ['warn', '値段は効いていない'] : ['mute', '差は小さい'];
+    prBody = `<table style="margin:2px 0 4px"><thead><tr><th class="l">売れ値（税込）</th><th>OFF</th><th>日数</th><th>PV/日</th><th>期間平均との差（ブランド補正）</th></tr></thead><tbody>${lvs.map(([p, x]) => `<tr><td class="l">${yen(p)}</td><td>${pe ? Math.round((1 - p / pe) * 100) + '%' : '—'}</td><td>${x.d}</td><td>${num(x.pv / x.d, 1)}</td><td>${sidx(x) ? relTxt(sidx(x) - 1) : '—'}</td></tr>`).join('')}</tbody></table>ブランド全体の動きをならすと、一番安い時（${yen(lo[0])}）は一番高い時（${yen(hi[0])}）より <b>${relTxt(r)}</b> 見られています。<small class="flat">※値段を変えた時期に画像やセールが重なると混ざります</small>`; }
+  // 商品力：PV（見られているか）×お気に入り率（見た人に刺さっているか）
+  const days = ae - s + 1, pvw = (sumR(pr.pv, s, ae) || 0) / days * 7, fO = rateR(pr, RATES[2], s, ae), fB = rateR(bR, RATES[2], s, ae), vO = rateR(pr, RATES[0], s, ae), vB = rateR(bR, RATES[0], s, ae);
+  let pwPill = null, pwBody;
+  if (fO == null || fB == null) pwBody = 'データが足りません。';
+  else { const hiP = pvw >= 1000, hiF = fO >= fB;
+    const [pl, msg] = hiP && hiF ? [['good', '強い'], 'よく見られていて、見た人にも気に入られている。']
+      : hiP ? [['warn', '見られているが刺さらない'], '見られてはいるが、ページを見て気に入られていない。素材感・サイズ・季節感など中身（ページ）を疑う。']
+      : hiF ? [['warn', '中身は良いのに見られていない'], '見た人には気に入られているのに、PVが週1,000に届いていない。広告・サムネ・商品名で露出を増やすと伸びる。']
+      : [['crit', '弱い'], 'PVもお気に入り率も低い。露出より先に商品・価格の見直し。'];
+    pwPill = pl;
+    pwBody = `PV 週${num(pvw)}（基準 週1,000）<br>お気に入り率 ${pct(fO, 1)}（ブランド ${pct(fB, 1)}・${relTxt(fO / fB - 1)}）<br>CVR ${pct(vO, 2)}（ブランド ${pct(vB, 2)}）<br><b>${msg}</b>`; }
+  $('#ctrCards').innerHTML = card('画像（変えた日の前後7日のPV）', imgPill, imgBody) + card('値段（売れ値ごとのPV）', prPill, prBody) + card('商品力（PV×お気に入り率）', pwPill, pwBody);
+  $('#ctrSum').innerHTML = `<div class="foot" style="margin:-2px 0 8px">期間 ${md(DAYS[s])}〜${md(DAYS[ae])}・PV 1日平均 ${num((sumR(pr.pv, s, ae) || 0) / days, 1)}（週${num(pvw)}）。期間は右上の「30日／60日／1年／全期間」で変わります</div>`;
+}
+
 /* ---------- 広告 ---------- */
 function renderAd(v) {
   const pr = P[state.p], [s, e] = range(), bs = buckets(s, e, state.gran), wk = state.gran === 'week', A = pr.ad;
   const C = sumR(A.cost, s, e), Rv = sumR(A.rev, s, e), I = sumR(A.imp, s, e), K = sumR(A.click, s, e), Cv = sumR(A.cv, s, e), Pm = sumR(pr.prem, s, e);
-  if (!C) { v.innerHTML = '<div class="panel empty">この期間は広告が出ていません。期間を「全期間」にすると過去の広告も見られます。</div>'; return; }
+  if (!C) { v.innerHTML = '<div class="panel empty" style="margin-bottom:14px">この期間は広告が出ていません（期間を「全期間」にすると過去の広告も見られます）。クリック率が出ないので、下はPVで見た分析です。</div>' + pvPanelHTML(); drawPvPanel(pr, s, e); return; }
   const roll = bs.map((b, i) => { if (wk) { const c = bsum(A.cost, b); return c ? bsum(A.rev, b) / c : null; } const c = sumZ(A.cost, b.s - 6, b.s); return c ? sumZ(A.rev, b.s - 6, b.s) / c : null; });
   const daily = bs.map(b => { const c = bsum(A.cost, b); return c ? bsum(A.rev, b) / c : null; });
   const evs = []; bs.forEach((b, i) => { if (bsum(pr.prem, b)) evs.push({ i, kind: 'prem' }); });
