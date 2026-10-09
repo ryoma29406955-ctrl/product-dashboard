@@ -105,6 +105,15 @@ button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent2);o
 .kpi .def{font-size:10.5px;color:var(--muted);margin-top:2px}
 .kpis.small .kpi{padding:9px 16px}
 .kpis.rates{grid-template-columns:repeat(6,minmax(0,1fr))}
+/* 週別の推移（概要） */
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px 14px}
+.wgrid.wide{grid-template-columns:1fr}
+.wcell{border:1px solid var(--line2);border-radius:10px;padding:8px 10px 2px;min-width:0}
+.wcell .wt{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12.5px}
+.wcell .wt b{font-weight:600;white-space:nowrap}
+.wcell .wv{font-size:11px;color:var(--muted);text-align:right}
+.wcell .wv .num{color:var(--ink);font-weight:600;font-size:13px}
+.wcell .wg{display:inline-block;font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-right:6px;font-weight:500;vertical-align:1px}
 .band{display:inline-block;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;margin-left:8px;vertical-align:middle;white-space:nowrap}
 .band.g{background:var(--good-bg);color:var(--good)} .band.y{background:var(--warn-bg);color:var(--warn)} .band.r{background:var(--crit-bg);color:var(--crit)}
 .tt td.bg-g{background:var(--good-bg)} .tt td.bg-y{background:var(--warn-bg)} .tt td.bg-r{background:var(--crit-bg)}
@@ -305,7 +314,7 @@ const SWATCH = { 'ブルー': '#4f7fbf', 'ライトグレー': '#cfd3d8', 'グ�
   'レッド': '#b8403e', 'チャコールグレー': '#4b4f55', 'オフホワイト': '#efece4', 'ライトブルー': '#9fc0e2', 'ピスタチオ': '#b5c98e', 'ライトパープル': '#b7a6d6', 'ベージュ': '#d9c6a5', 'アイボリー': '#efe8d6', 'ブラック': '#222428', 'ホワイト': '#f7f7f5', 'グリーン': '#4f7a4a', 'イエロー': '#e2c04c', 'オレンジ': '#e08a3c' };
 
 const hashP = () => { const h = decodeURIComponent(location.hash.slice(1)); return D && D.names[h] ? h : null; };
-const state = { span: '7d', p: hashP() || KEYS[0], tab: 'overview', period: '60', gran: 'day', tableOpen: true, dmode: 'rate', skuMode: 'units', skuTblOpen: true };
+const state = { span: '7d', p: hashP() || KEYS[0], tab: 'overview', period: '60', gran: 'day', tableOpen: true, dmode: 'rate', skuMode: 'units', skuTblOpen: true, wkSpan: '26', wkWide: false };
 const TABS = [['overview', '概要', '今どうなっているか'], ['daily', '日次', 'いつ何が動いたか'], ['sku', 'SKU', 'どの色が売れて、どれが切れるか'], ['ad', '広告', '広告は回収できているか']];
 
 /* ---------- 期間・バケット ---------- */
@@ -931,7 +940,8 @@ function renderOverview(v) {
           ${st.rows.map((r, j) => `<tr class="click" data-k="${pr.skus.indexOf(r.k)}"><td class="l">${sw(r.k.color)}${skuName(r.k)}</td><td>${num(r.stock)}</td><td>${num(r.u7)}</td><td><span class="pill ${r.status[0]}">${r.weeks != null ? r.weeks.toFixed(1) + '週' : r.status[1]}</span></td></tr>`).join('')}
           </tbody></table></div>
       </div>
-    </div>`;
+    </div>
+    ${weekGridHTML()}`;
   const bs = buckets(s, pe, 'week'), grp = [];
   tipFn = i => dayTip(pr, bs[i]).replace('<div class="foot" style="margin-top:4px">クリックで詳細</div>', '');
   chart($('#ovU'), { id: ++CID, buckets: bs, h: 170, series: unitSeries(pr, bs), group: grp, aria: '受注点数の週別推移（通常・予約）' });
@@ -943,6 +953,77 @@ function renderOverview(v) {
   document.querySelectorAll('tr[data-k]').forEach(t => t.onclick = () => openSku(+t.dataset.k));
   document.querySelectorAll('#segSpan button').forEach(b => b.onclick = () => { state.span = b.dataset.v; renderAll(); });
   $('#toSku').onclick = () => { state.tab = 'sku'; renderAll(); };
+  drawWeekGrid(pr);
+}
+
+/* ---------- 週別の推移（概要の下） ---------- */
+// 数は棒、率は線（点線＝ブランド平均）。並びはファネル順（見られた→気に入られた→カート→買われた→お金→広告）
+const WK_M = [
+  { g: '見られた', l: 'PV', f: (p, b) => bsum(p.pv, b), c: 'var(--s7)', pvref: true }, { g: '見られた', l: 'UU', f: (p, b) => bsum(p.uu, b), c: 'var(--s7)' },
+  { g: '気に入られた', l: 'お気に入り', f: (p, b) => bsum(p.fav, b), c: 'var(--s3)' }, { g: '気に入られた', l: 'お気に入り率', rate: 'favpv' },
+  { g: 'カート', l: 'カート投入', f: (p, b) => bsum(p.cart, b), c: 'var(--ink2)' }, { g: 'カート', l: 'カート率', rate: 'cart' },
+  { g: '買われた', l: '受注点数', units: true }, { g: '買われた', l: '購入者数', f: (p, b) => bsum(p.buyers, b), c: 'var(--s1)' }, { g: '買われた', l: 'CVR', rate: 'cvr' },
+  { g: '買われた', l: 'お気→購入率', rate: 'f2b' }, { g: 'お金', l: '受注額（税抜）', f: (p, b) => bsum(p.amt, b), c: 'var(--s1)', kind: 'yen' },
+  { g: 'お金', l: '売れ値（税抜・週の平均）', f: (p, b) => bmean(p.price, b), kind: 'yen', step: true, c: 'var(--ink2)', neutral: true },
+  { g: '広告', l: '広告費', f: (p, b) => bsum(p.ad.cost, b), c: 'var(--s2)', kind: 'yen', neutral: true }, { g: '広告', l: '広告経由の売上', f: (p, b) => bsum(p.ad.rev, b), c: 'var(--s1)', kind: 'yen' },
+  { g: '広告', l: 'ROAS', rate: 'roas' }, { g: '広告', l: '広告クリック率', rate: 'ctr' }];
+// 率は分母が少ない週だと0%や急な山になるので線を切る（この品番の線だけ。ブランド平均はそのまま）
+const WK_MIN_D = { cvr: [50, 'UU 50'], cart: [50, 'UU 50'], favpv: [100, 'PV 100'], f2b: [10, 'お気に入り 10'], ctr: [500, '表示 500'], roas: [1000, '広告費 ¥1,000'] };
+const rateMinD = (src, r, s, e) => { const d = sumR(AR(src, r.d), s, e), m = (WK_MIN_D[r.k] || [0])[0]; return d != null && d >= m ? rateR(src, r, s, e) : null; };
+WK_M.forEach(m => { if (m.rate) m.r = RATES.find(r => r.k === m.rate); });
+const WK_SPANS = [['12', '12週'], ['26', '半年'], ['52', '1年'], ['all', '全期間']];
+const wkFull = b => b.e - b.s + 1 === 7;
+function wkRange(pr) {
+  const e = N - 1, s0 = prStart(pr);
+  if (state.wkSpan === 'all') return [s0, e];
+  let s = Math.max(s0, e - (+state.wkSpan) * 7 + 1);
+  if (s > s0) while (s < e && DAYS[s].getDay() !== 1) s++;   // 最初の週を月曜からそろえる（データ開始の週はそのまま）
+  return [s, e];
+}
+const wkFmt = (m, v) => m.r ? pct(v, m.r.dg) : m.kind === 'yen' ? yen(v) : num(v);
+function wkHead(m, vals, bs) {   // 見出し：最後の7日そろった週の値と、その前週との比較
+  let i = bs.length - 1; while (i >= 0 && !wkFull(bs[i])) i--;
+  if (i < 0 || vals[i] == null) return '';
+  const v = vals[i], p = i > 0 ? vals[i - 1] : null; let d = '';
+  if (p != null) {
+    const x = m.r ? (v - p) * 100 : p ? v / p - 1 : null;
+    if (x != null && isFinite(x)) { const cl = m.neutral ? 'flat' : x > 0 ? 'up' : x < 0 ? 'down' : 'flat';
+      d = ` 前週比 <span class="${cl}">${x >= 0 ? '+' : ''}${m.r ? x.toFixed(m.r.dg) + 'pt' : Math.round(x * 100) + '%'}</span>`; }
+  }
+  return `${bs[i].label} <span class="num">${wkFmt(m, v)}</span>${d}`;
+}
+function wkTip(pr, bR, m, b, v) {
+  const n = b.e - b.s + 1, row = (l, x) => `<div class="r"><span>${l}</span><span>${x}</span></div>`;
+  let h = `<h4>${md(DAYS[b.s])}〜${md(DAYS[b.e])}${n < 7 ? `（${n}日分）` : ''}</h4>` + row(m.l, wkFmt(m, v));
+  if (m.units) h += row('うち予約', b.s > SKU_END ? '未取得' : num(rsvB(pr, b) || 0));
+  if (m.r) h += row('ブランド平均', wkFmt(m, rateR(bR, m.r, b.s, b.e))) + row(m.r.def, `${num(sumR(AR(pr, m.r.n), b.s, b.e))}／${num(sumR(AR(pr, m.r.d), b.s, b.e))}`);
+  return h;
+}
+function weekGridHTML() {
+  return `<div class="panel" id="wkPanel">
+    <div class="ph"><h2>週別の推移</h2><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div class="seg sm" id="wkSpan">${WK_SPANS.map(([k, l]) => `<button aria-pressed="${state.wkSpan === k}" data-v="${k}">${l}</button>`).join('')}</div><button class="link" id="wkWide" style="padding:3px 10px;font-size:12px">${state.wkWide ? '⇔ 2列に戻す' : '⇔ 1列で大きく'}</button></div></div>
+    ${legend([['var(--s1)', 'この品番'], ['var(--muted)', 'ブランド平均（率のグラフの点線）'], ['var(--rsv)', '受注の予約']])}
+    <div class="foot" style="margin:-2px 0 8px">月曜始まり。最後の週は途中まで。見出しの数字は最後の7日そろった週と、その前週との比較。率は分母が少ない週（UU 50・PV 100・お気に入り 10・広告表示 500・広告費¥1,000未満）は線を切っています。カーソルを合わせると全部のグラフが同じ週を指します。</div>
+    <div class="wgrid${state.wkWide ? ' wide' : ''}">${WK_M.map((m, j) => `<div class="wcell"><div class="wt"><b><span class="wg">${m.g}</span>${m.l}</b><span class="wv" id="wkh${j}"></span></div>${m.r ? `<div class="foot" style="margin:1px 0 0">${m.r.def}</div>` : ''}<div class="chart" id="wk${j}"></div></div>`).join('')}</div></div>`;
+}
+function drawWeekGrid(pr) {
+  const [s, e] = wkRange(pr), bs = buckets(s, e, 'week'), bR = BR(pr), grp = [], H = state.wkWide ? 160 : 118;
+  WK_M.forEach((m, j) => {
+    const host = $('#wk' + j); if (!host) return;
+    let series, vals, kind = m.kind, refs = null;
+    if (m.units) { series = unitSeries(pr, bs); vals = bs.map(b => bsum(pr.units, b)); }
+    else if (m.r) { vals = bs.map(b => rateMinD(pr, m.r, b.s, b.e)); kind = 'pct';
+      series = [{ type: 'line', color: 'var(--s1)', values: vals }, { type: 'line', color: 'var(--muted)', dash: true, values: bs.map(b => rateR(bR, m.r, b.s, b.e)) }];
+      refs = m.r.k === 'roas' ? [{ v: 1, label: '100%' }] : (CRIT_REFS[m.r.k] || null); }
+    else { vals = bs.map(b => m.f(pr, b)); series = [{ type: m.step ? 'step' : 'bar', color: m.c, values: vals }];
+      if (m.pvref && Math.max(0, ...vals.filter(v => v != null)) >= 600) refs = [{ v: 1000, label: '週1000' }];
+      if (m.step && pr.proper) refs = [{ v: pr.proper, label: 'プロパー' }]; }
+    $('#wkh' + j).innerHTML = wkHead(m, vals, bs);
+    chart(host, { id: ++CID, buckets: bs, group: grp, h: H, kind, refs, zero: m.step ? false : undefined, series, aria: m.l + 'の週別推移',
+      tip: i => wkTip(pr, bR, m, bs[i], vals[i]) });
+  });
+  document.querySelectorAll('#wkSpan button').forEach(b => b.onclick = () => { state.wkSpan = b.dataset.v; renderAll(); });
+  $('#wkWide').onclick = () => { state.wkWide = !state.wkWide; renderAll(); };
 }
 
 /* ---------- ツールチップ ---------- */
