@@ -287,7 +287,10 @@ const EMBED = window.parent !== window;   // 商品ステータスの「商品�
 const $ = s => document.querySelector(s);
 const P = {}, KEYS = D ? (D.order || Object.keys(D.names)) : [];   // P＝読み込んだ品番の日次データ（karte_d/品番.js を開いた時に読む）
 const _kdWait = {};
-window.KD = (h, obj) => { P[h] = obj; (_kdWait[h] || []).forEach(f => f()); delete _kdWait[h]; };
+// 売れ値・プロパーは税込で表示する（データは売上集計の税抜。読み込んだ時に×1.1して丸める＝ZOZOの表示価格と同じ）。受注額・客単価は税抜のまま
+const TAX = 1.1, taxIn = v => v == null ? v : Math.round(v * TAX);
+function toTaxIn(o) { if (o._taxIn) return o; o.price = (o.price || []).map(taxIn); if (o.prices) o.prices = o.prices.map(d => d && d.map(([p, u]) => [taxIn(p), u])); o.proper = taxIn(o.proper); o._taxIn = true; return o; }
+window.KD = (h, obj) => { P[h] = toTaxIn(obj); (_kdWait[h] || []).forEach(f => f()); delete _kdWait[h]; };
 function loadP(h, cb) {
   if (P[h]) return cb();
   const first = !_kdWait[h]; (_kdWait[h] = _kdWait[h] || []).push(cb); if (!first) return;
@@ -545,7 +548,7 @@ function renderChrome() {
   $('#phead').innerHTML = `<div><h1>${pr.name}</h1><div class="chips"><span class="chip strong">${pr.brand}</span><span class="chip num">${state.p}</span>${relChip(pr)}${pr.cost && pr.cost.unit ? `<span class="chip num" title="${pr.cost.yen ? '原価' + num(pr.cost.genka) + '円（買い付け）＋輸送450円' : '原価' + num(pr.cost.genka) + '元×26円×1.1＋輸送450円'}">下代 ${yen(pr.cost.unit)}</span>` : ''}<span class="chip">SKU ${pr.skus.length}</span>
       <span class="chip num">在庫 ${num(pr.skus.reduce((a, k) => a + k.stock, 0))}</span>${evalChip(state.p)}</div></div>
     <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">
-      <div><div class="foot">直近の売れ値（税抜・${li >= 0 ? md(DAYS[li]) : '—'}）</div><div class="pricebox num"><span class="big">${yen(cur)}</span>${pr.proper ? `<span class="was">${yen(pr.proper)}</span>` : ''}${off != null && off > .01 ? `<span class="off">${Math.round(off * 100)}%OFF</span>` : ''}</div></div>
+      <div><div class="foot">直近の売れ値（税込・${li >= 0 ? md(DAYS[li]) : '—'}）</div><div class="pricebox num"><span class="big">${yen(cur)}</span>${pr.proper ? `<span class="was">${yen(pr.proper)}</span>` : ''}${off != null && off > .01 ? `<span class="off">${Math.round(off * 100)}%OFF</span>` : ''}</div></div>
       ${pr.url ? `<a class="link" href="${pr.url}" target="_blank" rel="noopener">ZOZOで見る ↗</a>` : ''}</div>`;
   if ($('#evChip')) $('#evChip').onclick = () => { state.tab = 'overview'; renderAll(); };
   $('#tabs').innerHTML = TABS.map(([k, l, s]) => `<button class="tab" role="tab" aria-selected="${k === state.tab}" data-t="${k}">${l}<small>${s}</small></button>`).join('');
@@ -603,7 +606,7 @@ function evAnalyze(code, end) {   // end＝判定する7日の最終日（省略
   // 保存止まり（お気に入りは付くのに買われない）・セール依存
   const bF2B = bR ? rateR(bR, RATES.find(r => r.k === 'f2b'), W7[0], W7[1]) : null, f2b = evSdiv(c.buy, c.fav);
   const saveStuck = val['転換'] != null && val['転換'] < .015 && bF2B != null && f2b != null && c.fav >= 30 && f2b < bF2B * 0.55;
-  const unit = c.units ? c.amt / c.units : null, saleDep = !!(pr.proper && unit && unit < pr.proper * 0.85);
+  const unit = c.units ? c.amt / c.units * TAX : null, saleDep = !!(pr.proper && unit && unit < pr.proper * 0.85);   // 受注額は税抜なので×1.1して税込のプロパーと比べる
   const hold = c.uu < 100 && o.uu < 100;
   return { code, pr, it, c, o, W7, W0, marks, det, prev, trend, val, adState, stockState, cover: hasCover ? cover : null, soNow, saveStuck, saleDep, unit, hold };
 }
@@ -748,7 +751,7 @@ function reviewCard(code) {
       <p class="rv-big num">${EV_NAME[k]} ${Ap.det[k].split('／')[0]} → <b>${now}</b></p><p class="rv-s">${st[2]}（${f(pe - 13)}〜${f(pe - 7)} → ${f(pe - 6)}〜${f(pe)}）</p>`;
   }
   // ② 何が動いたか（価格とCVR、PVと広告・ランキング）
-  const pNow = c.units ? c.amt / c.units : meanR(pr.price, pe - 6, pe), pPrev = o.units ? o.amt / o.units : meanR(pr.price, pe - 13, pe - 7);
+  const pNow = c.units ? c.amt / c.units * TAX : meanR(pr.price, pe - 6, pe), pPrev = o.units ? o.amt / o.units * TAX : meanR(pr.price, pe - 13, pe - 7);   // 税込
   const cvN = c.uu ? c.buy / c.uu : null, cvP = o.uu ? o.buy / o.uu : null, cvOk = c.uu >= EV_MIN && o.uu >= EV_MIN;
   const pr_ = pNow && pPrev ? pNow / pPrev - 1 : null, cr = cvOk && cvP ? cvN / cvP - 1 : null;
   const moves = [];
@@ -965,7 +968,7 @@ const WK_M = [
   { g: 'カート', l: 'カート投入', f: (p, b) => bsum(p.cart, b), c: 'var(--ink2)' }, { g: 'カート', l: 'カート率', rate: 'cart' },
   { g: '買われた', l: '受注点数', units: true }, { g: '買われた', l: '購入者数', f: (p, b) => bsum(p.buyers, b), c: 'var(--s1)' }, { g: '買われた', l: 'CVR', rate: 'cvr' },
   { g: '買われた', l: 'お気→購入率', rate: 'f2b' }, { g: 'お金', l: '受注額（税抜）', f: (p, b) => bsum(p.amt, b), c: 'var(--s1)', kind: 'yen' },
-  { g: 'お金', l: '売れ値（税抜・週の平均）', f: (p, b) => bmean(p.price, b), kind: 'yen', step: true, c: 'var(--ink2)', neutral: true },
+  { g: 'お金', l: '売れ値（税込・週の平均）', f: (p, b) => bmean(p.price, b), kind: 'yen', step: true, c: 'var(--ink2)', neutral: true },
   { g: '広告', l: '広告費', f: (p, b) => bsum(p.ad.cost, b), c: 'var(--s2)', kind: 'yen', neutral: true }, { g: '広告', l: '広告経由の売上', f: (p, b) => bsum(p.ad.rev, b), c: 'var(--s1)', kind: 'yen' },
   { g: '広告', l: 'ROAS', rate: 'roas' }, { g: '広告', l: '広告クリック率', rate: 'ctr' }];
 // 率は分母が少ない週だと0%や急な山になるので線を切る（この品番の線だけ。ブランド平均はそのまま）
@@ -1034,7 +1037,7 @@ function dayTip(pr, b) {
   const row = (col, l, v) => `<div class="r"><span>${col ? `<i style="background:${col}"></i>` : ''}${l}</span><span>${v}</span></div>`;
   const rv = rsvB(pr, b);
   return `<h4>${h}</h4>` + row('var(--s1)', '受注点数', num(bsum(pr.units, b))) + row('var(--rsv)', 'うち予約', b.s > SKU_END ? '未取得' : num(rv || 0)) + row('', '受注額', yen(bsum(pr.amt, b))) + row('var(--s3)', 'お気に入り', num(bsum(pr.fav, b))) +
-    row('var(--s7)', 'PV', num(bsum(pr.pv, b))) + row('', '売れ値（税抜）', yen(pr_)) + row('var(--s2)', '広告費', yen(c)) + row('', 'ROAS', c ? pct(r / c, 0) : '—') +
+    row('var(--s7)', 'PV', num(bsum(pr.pv, b))) + row('', '売れ値（税込）', yen(pr_)) + row('var(--s2)', '広告費', yen(c)) + row('', 'ROAS', c ? pct(r / c, 0) : '—') +
     (rk != null ? row('', 'ランキング経由PV', num(rk)) : '') + `<div class="foot" style="margin-top:4px">クリックで詳細</div>`;
 }
 
@@ -1081,7 +1084,7 @@ function renderDaily(v) {
         <div class="row-title"><b>受注点数</b><span>期間合計 ${num(sumR(pr.units, s, e))}点（うち予約 ${num(sumR(pr.resv || [], s, e) || 0)}点）・${yen(sumR(pr.amt, s, e))}</span></div>${RSV_LEG()}<div class="chart" id="d1"></div>
         <div class="row-title"><b>お気に入り</b><span>期間合計 ${num(sumR(pr.fav, s, e))}</span></div><div class="chart" id="d2"></div>
         <div class="row-title"><b>PV</b><span>期間合計 ${num(sumR(pr.pv, s, e))}</span></div><div class="chart" id="d3"></div>
-        <div class="row-title"><b>売れ値（税抜・その${wk ? '週の平均' : '日一番多い価格'}）</b><span>点線＝プロパー ${yen(pr.proper)}</span></div><div class="chart" id="d4"></div>
+        <div class="row-title"><b>売れ値（税込・その${wk ? '週の平均' : '日一番多い価格'}）</b><span>点線＝プロパー ${yen(pr.proper)}</span></div><div class="chart" id="d4"></div>
         <div class="row-title"><b>広告費</b><span>期間合計 ${yen(sumR(pr.ad.cost, s, e))}</span></div><div class="chart" id="d5"></div>
       </div></div>`;
   const grp = [], click = i => wk ? null : openDay(bs[i].s);
@@ -1102,7 +1105,7 @@ function dailyTable(pr, bs, wk) {
   const rows = [...RATES.map(r => [r.l, b => pct(rateR(pr, r, b.s, b.e), r.dg), null, CRIT[r.k] ? b => CRIT[r.k](rateR(pr, r, b.s, b.e)) : null]),
     ['受注点数', b => num(bsum(pr.units, b)), 'sep'], ['　うち予約', b => b.s > SKU_END ? '—' : num(rsvB(pr, b) || 0)], ['受注額', b => yen(bsum(pr.amt, b))], ['お気に入り', b => num(bsum(pr.fav, b))],
     ['PV', b => num(bsum(pr.pv, b)), null, wk ? b => (b.e - b.s >= 6 ? CRIT.pvw(bsum(pr.pv, b)) : null) : null],   /* 途中の週は色を付けない */
-    ['UU', b => num(bsum(pr.uu, b))], ['販売価格（税抜）', b => priceCell(pr, b)], ['クーポン利用額', b => cpnCell(pr, b)],
+    ['UU', b => num(bsum(pr.uu, b))], ['販売価格（税込）', b => priceCell(pr, b)], ['クーポン利用額', b => cpnCell(pr, b)],
     ['ZOZO手数料（37%）', b => pfCell(pr, b, 'fee')], ['原価（下代×点数）', b => pfCell(pr, b, 'cost')], ['利益（目安）', b => pfCell(pr, b, 'gp'), 'sep'], ['利益率', b => pfCell(pr, b, 'rate')],
     ['広告の表示回数（imp）', b => num(bsum(pr.ad.imp, b))], ['広告クリック', b => num(bsum(pr.ad.click, b))], ['広告費', b => yen(bsum(pr.ad.cost, b))], ['広告経由の売上', b => yen(bsum(pr.ad.rev, b))], ['ランキングPV', b => num(bsum(pr.rank, b))]];
   const sun = b => !wk && b.d.getDay() === 0 ? ' class="sun"' : '';
@@ -1134,7 +1137,7 @@ function skuTrendTable(pr, rows, cols, bs, key, wk) {
   return `<table class="tt heat"><thead><tr><th class="stk">${wk ? '週' : '日付'}</th>${bs.map(b => `<th${sun(b)}>${wk ? b.label : md(b.d)}${wk ? '' : `<small>${DOW[b.d.getDay()]}</small>`}</th>`).join('')}<th>合計</th></tr></thead>
     <tbody>${rows.map((r, j) => `<tr><td class="stk"><i class="dot" style="background:${cols[j]}"></i>${skuName(r.k)}</td>${vals[j].map(cell).join('')}<td><b>${num(vals[j].reduce((a, x) => a + x, 0))}</b></td></tr>`).join('')}
     <tr class="sep"><td class="stk"><b>合計</b></td>${tot.map(v => `<td><b>${num(v)}</b></td>`).join('')}<td><b>${num(tot.reduce((a, x) => a + x, 0))}</b></td></tr>
-    <tr class="sep"><td class="stk">販売価格（税抜）</td>${bs.map(b => `<td${sun(b)}>${priceCell(pr, b)}</td>`).join('')}<td></td></tr>
+    <tr class="sep"><td class="stk">販売価格（税込）</td>${bs.map(b => `<td${sun(b)}>${priceCell(pr, b)}</td>`).join('')}<td></td></tr>
     <tr><td class="stk">クーポン利用額</td>${bs.map(b => `<td${sun(b)}>${cpnCell(pr, b)}</td>`).join('')}<td>${cpnCell(pr, { s: bs[0].s, e: bs[bs.length - 1].e })}</td></tr>
     <tr><td class="stk">利益（目安・本店）</td>${bs.map(b => `<td${sun(b)}>${pfCell(pr, b, 'gp')}</td>`).join('')}<td><b>${pfCell(pr, { s: bs[0].s, e: bs[bs.length - 1].e }, 'gp')}</b></td></tr></tbody></table>`;
 }
@@ -1223,7 +1226,7 @@ function drawCtrPanel(pr, s, e) {
     const why = [...pev.filter(p => p.i === a).map(p => `${p.kind === 'down' ? '▼値下げ' : '▲値上げ'} ${yen(p.from)}→${yen(p.to)}`), ...acts.filter(x => x[0] === a).map(x => `◆${x[1]}：${x[2]}`)].join('<br>') || (j === 0 ? '（期間のはじめ）' : '');
     segs.push({ a, b, im, ctr: im >= CTR_MIN ? k / im : null, bctr: ctrOf(bR, a, b), why, pm, off: pe && pm ? 1 - pm / pe : null, fav: rateR(pr, RATES[2], a, b), cvr: rateR(pr, RATES[0], a, b) });
   }
-  $('#ctrSeg').innerHTML = `<table><thead><tr><th class="l">区間</th><th class="l">何が変わったか</th><th>売れ値</th><th>OFF</th><th>表示</th><th>クリック率</th><th>ブランド比</th><th>お気に入り率</th><th>CVR</th></tr></thead><tbody>${segs.map(g => `<tr><td class="l">${md(DAYS[g.a])}〜${md(DAYS[g.b])}<small class="flat">（${g.b - g.a + 1}日）</small></td><td class="l" style="max-width:340px;white-space:normal">${g.why}</td><td>${yen(g.pm)}</td><td>${g.off != null ? Math.round(g.off * 100) + '%' : '—'}</td><td>${num(g.im)}</td><td><b>${pct(g.ctr, 2)}</b></td><td>${g.ctr != null && g.bctr ? relTxt(g.ctr / g.bctr - 1) : '—'}</td><td>${pct(g.fav, 1)}</td><td>${pct(g.cvr, 2)}</td></tr>`).join('')}</tbody></table>`;
+  $('#ctrSeg').innerHTML = `<table><thead><tr><th class="l">区間</th><th class="l">何が変わったか</th><th>売れ値（税込）</th><th>OFF</th><th>表示</th><th>クリック率</th><th>ブランド比</th><th>お気に入り率</th><th>CVR</th></tr></thead><tbody>${segs.map(g => `<tr><td class="l">${md(DAYS[g.a])}〜${md(DAYS[g.b])}<small class="flat">（${g.b - g.a + 1}日）</small></td><td class="l" style="max-width:340px;white-space:normal">${g.why}</td><td>${yen(g.pm)}</td><td>${g.off != null ? Math.round(g.off * 100) + '%' : '—'}</td><td>${num(g.im)}</td><td><b>${pct(g.ctr, 2)}</b></td><td>${g.ctr != null && g.bctr ? relTxt(g.ctr / g.bctr - 1) : '—'}</td><td>${pct(g.fav, 1)}</td><td>${pct(g.cvr, 2)}</td></tr>`).join('')}</tbody></table>`;
   const card = (title, pill, body) => `<div class="panel" style="padding:10px 12px"><div class="ph" style="margin-bottom:4px"><h2 style="font-size:12.5px">${title}</h2>${pill ? `<span class="pill ${pill[0]}">${pill[1]}</span>` : ''}</div><div style="font-size:12.5px;line-height:1.7">${body}</div></div>`;
   // 画像：変えた日の前後7日（ブランド全体の動きを引く）
   let imgBody, imgPill = null;
@@ -1252,7 +1255,7 @@ function drawCtrPanel(pr, s, e) {
   if (lvs.length < 2) prBody = lvs.length ? `この期間は売れ値がほぼ ${yen(lvs[0][0])} だけなので、値段との関係はまだ見られません。期間を長くすると出ることがあります。` : '表示が少なくて見られません。';
   else { const lo = lvs[0], hi = lvs[lvs.length - 1], il = idx(lo[1]), ih = idx(hi[1]), r = il && ih ? il / ih - 1 : (lo[1].k / lo[1].im) / (hi[1].k / hi[1].im) - 1;
     prPill = r >= .15 ? ['good', '安いと押される'] : r <= -.15 ? ['warn', '値段は効いていない'] : ['mute', '差は小さい'];
-    prBody = `<table style="margin:2px 0 4px"><thead><tr><th class="l">売れ値</th><th>OFF</th><th>日数</th><th>表示</th><th>クリック率</th><th>同じ日のブランド比</th></tr></thead><tbody>${lvs.map(([p, x]) => `<tr><td class="l">${yen(p)}</td><td>${pe ? Math.round((1 - p / pe) * 100) + '%' : '—'}</td><td>${x.d}</td><td>${num(x.im)}</td><td>${pct(x.k / x.im, 2)}</td><td>${idx(x) ? relTxt(idx(x) - 1) : '—'}</td></tr>`).join('')}</tbody></table>同じ日のブランド平均と比べると、一番安い時（${yen(lo[0])}）は一番高い時（${yen(hi[0])}）より <b>${relTxt(r)}</b> クリックされています。<small class="flat">※値段を変えた時期に画像やセールが重なると混ざります</small>`; }
+    prBody = `<table style="margin:2px 0 4px"><thead><tr><th class="l">売れ値（税込）</th><th>OFF</th><th>日数</th><th>表示</th><th>クリック率</th><th>同じ日のブランド比</th></tr></thead><tbody>${lvs.map(([p, x]) => `<tr><td class="l">${yen(p)}</td><td>${pe ? Math.round((1 - p / pe) * 100) + '%' : '—'}</td><td>${x.d}</td><td>${num(x.im)}</td><td>${pct(x.k / x.im, 2)}</td><td>${idx(x) ? relTxt(idx(x) - 1) : '—'}</td></tr>`).join('')}</tbody></table>同じ日のブランド平均と比べると、一番安い時（${yen(lo[0])}）は一番高い時（${yen(hi[0])}）より <b>${relTxt(r)}</b> クリックされています。<small class="flat">※値段を変えた時期に画像やセールが重なると混ざります</small>`; }
   // 商品力：クリック率（入口）×お気に入り率（中身）をブランド平均と比べる
   const cO = ctrOf(pr, s, ae), cB = ctrOf(bR, s, ae), fO = rateR(pr, RATES[2], s, ae), fB = rateR(bR, RATES[2], s, ae), vO = rateR(pr, RATES[0], s, ae), vB = rateR(bR, RATES[0], s, ae);
   let pwPill = null, pwBody;
@@ -1313,7 +1316,7 @@ function openDay(i) {
   openDrawer(mdw(d), `${state.p}・${pr.name.replace(/【.*?】|《.*?》/g, '').slice(0, 24)}`, `
     <div class="dsec"><h4>率（その日／直近7日／ブランド7日）</h4><table><thead><tr><th class="l"></th><th>その日</th><th>7日</th><th>ブランド</th></tr></thead><tbody>${RATES.map(r => `<tr><td class="l">${r.l}</td><td>${pct(rateR(pr, r, i, i), r.dg)}</td><td>${pct(rateR(pr, r, i - 6, i), r.dg)}</td><td>${pct(rateR(BR(pr), r, i - 6, i), r.dg)}</td></tr>`).join('')}</tbody></table></div>
     <div class="dsec"><h4>お客さんの動き（商品別実績）</h4>${kv([['PV', num(pr.pv[i])], ['UU', num(pr.uu[i])], ['お気に入り', num(pr.fav[i])], ['カート投入', num(pr.cart[i])], ['受注点数', num(pr.units[i])], ['受注額（税抜）', yen(pr.amt[i])], ['購入者', num(pr.buyers[i])], ['CVR', pr.uu[i] ? pct(pr.buyers[i] / pr.uu[i], 2) : '—']])}</div>
-    <div class="dsec"><h4>価格・露出</h4>${kv([['売れ値（税抜）', yen(pr.price[i])], ['プロパー', yen(pr.proper)], ['ランキング経由PV', pr.rank[i] != null ? num(pr.rank[i]) : i > RANK_END ? 'データ未取得' : '掲載なし']])}</div>
+    <div class="dsec"><h4>価格・露出</h4>${kv([['売れ値（税込）', yen(pr.price[i])], ['プロパー', yen(pr.proper)], ['ランキング経由PV', pr.rank[i] != null ? num(pr.rank[i]) : i > RANK_END ? 'データ未取得' : '掲載なし']])}</div>
     <div class="dsec"><h4>広告</h4>${A.imp[i] ? kv([['表示回数', num(A.imp[i])], ['クリック', num(A.click[i])], ['クリック率', pct(A.click[i] / A.imp[i], 2)], ['広告費', yen(c)], ['経由件数', num(A.cv[i])], ['経由売上', yen(r)], ['ROAS', c ? pct(r / c, 0) : '—'], ['プレミア表示', num(pr.prem[i] || 0)]]) : '<div class="foot">広告は出ていません</div>'}</div>
     <div class="dsec"><h4>SKU別（売上集計・お気に入り日次）</h4>${i > SKU_END ? '<div class="foot">この日のSKU別データはまだありません</div>' : skus.length ? `<table><thead><tr><th class="l">カラー</th><th>売れ</th><th>うち予約</th><th>お気に入り</th></tr></thead><tbody>${skus.map(x => `<tr><td class="l">${sw(x.k.color)}${skuName(x.k)}</td><td>${num(x.u)}</td><td>${num(x.r)}</td><td>${num(x.f)}</td></tr>`).join('')}</tbody></table>` : '<div class="foot">この日はSKU別の売れ・お気に入りがありません</div>'}</div>`);
 }

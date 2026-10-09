@@ -242,7 +242,7 @@ function render() {
 
   // 品番一覧
   const COLS = [['g', '区分', 'l'], ['h', '品番', 'l'], ['n', '品名', 'l'], ['up', '伸びしろ/週'], ['amt', '受注額/週'], ['pv', 'PV/週'], ['pvw', '前週比'], ['fav', 'お気に入り率'], ['cvr', 'CVR'],
-    ['aov', '客単価'], ['off', '売れ値（割引）'], ['stock', '在庫（カバー）'], ['adcost', '広告費/週'], ['act', '次の一手', 'l'], ['c', 'カテゴリ', 'l']];
+    ['aov', '客単価'], ['off', '売れ値（税込・割引）'], ['stock', '在庫（カバー）'], ['adcost', '広告費/週'], ['act', '次の一手', 'l'], ['c', 'カテゴリ', 'l']];
   const key = (p, k) => k === 'pvw' ? (p.ppv ? p.pv / p.ppv : -1) : k === 'off' ? (p.off ?? -1) : p[k] ?? -1;
   let rows = A.ps.filter(p => (state.g === 'all' || p.g === state.g) && (!state.q || (p.h + p.n + p.c).includes(state.q)));
   rows.sort((a, b) => { const x = key(a, state.sort), y = key(b, state.sort); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * state.dir; });
@@ -254,7 +254,7 @@ function render() {
       <td class="num"><b>${p.up >= 1 ? '+' + yen(p.up) : '—'}</b></td><td class="num">${yen(p.amt)}</td>
       <td class="num">${num(p.pv)}${bd(pvB(p.pv))}</td><td class="num">${p.ppv ? (p.pv / p.ppv >= 1 ? '+' : '') + Math.round((p.pv / p.ppv - 1) * 100) + '%' : '—'}</td>
       <td class="num">${pct(p.fav)}${bd(p.pv >= 300 ? favB(p.fav) : null)}</td><td class="num">${pct(p.cvr, 2)}${bd(p.uu >= 300 ? cvrB(p.cvr) : null)}</td>
-      <td class="num">${yen(p.aov)}</td><td class="num">${yen(p.unit)}${p.off != null && p.off > .02 ? `（${Math.round(p.off * 100)}%引）` : ''}</td>
+      <td class="num">${yen(p.aov)}</td><td class="num">${yen(p.unit != null ? p.unit * 1.1 : null)}${p.off != null && p.off > .02 ? `（${Math.round(p.off * 100)}%引）` : ''}</td>
       <td class="num ${p.cover != null && p.cover < 28 ? 'warn' : ''}">${p.stock != null ? num(p.stock) : '—'}${p.cover != null ? `（${num(p.cover)}日）` : ''}</td>
       <td class="num">${p.adcost ? yen(p.adcost) : '—'}</td><td class="act">${p.act}</td><td class="l">${esc(p.c)}</td></tr>`).join('')}</tbody></table></div>
     <p class="note" style="margin:8px 0 0">PVが300未満の品番はお気に入り率の、UUが300未満の品番はCVRの色を付けていません（数が少なく、ぶれるため）。在庫は全チャネル・POP-UP取り置きを除いた数、カバー日数は推移表ベース。行を押すと商品カルテを開きます。</p>`;
