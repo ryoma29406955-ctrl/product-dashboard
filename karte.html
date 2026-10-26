@@ -231,6 +231,18 @@ tbody tr.click:hover{background:var(--panel2)}
 .row-title b{font-weight:600;color:var(--ink)}
 details summary{cursor:pointer;color:var(--accent);font-size:12.5px;padding:6px 0}
 .empty{color:var(--muted);padding:28px 0;text-align:center}
+/* 改善タブ */
+.imp-tl{display:flex;flex-direction:column;gap:4px}
+.imp-card{border:1px solid var(--line2);border-radius:10px;padding:12px 14px;min-width:0}
+.imp-h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.imp-h .dt{font-weight:600;font-size:13.5px}
+.imp-h .ct{font-size:13px;color:var(--ink)}
+.imp-why{margin:8px 0 6px;padding:7px 10px;background:var(--panel2);border-radius:8px;font-size:12.5px;line-height:1.6}
+.imp-why b{color:var(--ink2);font-weight:600;margin-right:8px}
+.imp-v{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin:6px 0 4px}
+.imp-tbl tr.goal td{background:var(--accent-soft)}
+.imp-tbl th small{margin-left:4px}
+.imp-link{text-align:center;color:var(--muted);font-size:11.5px;padding:0}
 .foot{font-size:11.5px;color:var(--muted)}
 /* tooltip */
 .tip{position:fixed;z-index:30;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:8px 10px;font-size:12px;min-width:170px;display:none}
@@ -280,7 +292,7 @@ details summary{cursor:pointer;color:var(--accent);font-size:12.5px;padding:6px 
 </aside>
 <div class="tip" id="tip"></div>
 
-<script src="karte_data.js?v=20261026104014"></script>
+<script src="karte_data.js?v=20261026120055"></script>
 <script>
 const D = window.KARTE_DATA;
 if (!D) document.body.innerHTML = '<p style="padding:24px">カルテのデータ（karte_data.js）が見つかりません。商品ステータスと同じフォルダに置いてください。</p>';
@@ -295,7 +307,7 @@ window.KD = (h, obj) => { P[h] = toTaxIn(obj); (_kdWait[h] || []).forEach(f => f
 function loadP(h, cb) {
   if (P[h]) return cb();
   const first = !_kdWait[h]; (_kdWait[h] = _kdWait[h] || []).push(cb); if (!first) return;
-  const s = document.createElement('script'); s.src = 'karte_d/' + encodeURIComponent(h) + '.js?v=20261026104014';
+  const s = document.createElement('script'); s.src = 'karte_d/' + encodeURIComponent(h) + '.js?v=20261026120055';
   s.onerror = () => { delete _kdWait[h]; const v = document.getElementById('view'); if (v) v.innerHTML = '<div class="panel empty">この品番のデータ（karte_d/' + h + '.js）が見つかりません</div>'; };
   document.head.appendChild(s);
 }
@@ -319,7 +331,7 @@ const SWATCH = { 'ブルー': '#4f7fbf', 'ライトグレー': '#cfd3d8', 'グ�
 
 const hashP = () => { const h = decodeURIComponent(location.hash.slice(1)); return D && D.names[h] ? h : null; };
 const state = { span: '7d', p: hashP() || KEYS[0], tab: 'overview', period: '60', gran: 'day', tableOpen: true, dmode: 'rate', skuMode: 'units', skuTblOpen: true, wkSpan: '26', wkWide: false };
-const TABS = [['overview', '概要', '今どうなっているか'], ['daily', '日次', 'いつ何が動いたか'], ['sku', 'SKU', 'どの色が売れて、どれが切れるか'], ['ad', '広告', '広告は回収できているか']];
+const TABS = [['overview', '概要', '今どうなっているか'], ['daily', '日次', 'いつ何が動いたか'], ['sku', 'SKU', 'どの色が売れて、どれが切れるか'], ['ad', '広告', '広告は回収できているか'], ['improve', '改善', '何を変えて、どうなったか']];
 
 /* ---------- 期間・バケット ---------- */
 function prStart(pr) { const c = [firstIdx(pr.pv), firstIdx(pr.units), firstIdx(pr.ad.cost)].filter(x => x >= 0); return c.length ? Math.min(...c) : 0; }
@@ -559,9 +571,9 @@ function renderChrome() {
   if ($('#evChip')) $('#evChip').onclick = () => { state.tab = 'overview'; renderAll(); };
   $('#tabs').innerHTML = TABS.map(([k, l, s]) => `<button class="tab" role="tab" aria-selected="${k === state.tab}" data-t="${k}">${l}<small>${s}</small></button>`).join('');
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => { state.tab = b.dataset.t; renderAll(); });
-  $('#segPeriod').innerHTML = [['30', '30日'], ['60', '60日'], ['365', '1年'], ['all', '全期間']].map(([k, l]) => `<button aria-pressed="${state.period === k}" data-v="${k}">${l}</button>`).join('');
+  $('#segPeriod').innerHTML = [['30', '30日'], ['60', '60日'], ['365', '1年'], ['all', '全期間']].map(([k, l]) => `<button aria-pressed="${state.period === k}" data-v="${k}" ${state.tab === 'improve' ? 'disabled title="改善タブは発売からの施策を全部出します"' : ''}>${l}</button>`).join('');
   document.querySelectorAll('#segPeriod button').forEach(b => b.onclick = () => { state.period = b.dataset.v; renderAll(); });
-  const granOff = state.tab === 'overview';
+  const granOff = state.tab === 'overview' || state.tab === 'improve';
   $('#segGran').innerHTML = [['day', '日'], ['week', '週']].map(([k, l]) => `<button aria-pressed="${state.gran === k}" data-v="${k}" ${granOff ? 'disabled title="日次・SKU・広告タブで使えます"' : ''}>${l}</button>`).join('');
   document.querySelectorAll('#segGran button').forEach(b => b.onclick = () => { state.gran = b.dataset.v; renderAll(); });
 }
@@ -1382,6 +1394,112 @@ function renderAd(v) {
   drawCtrPanel(pr, s, e);
 }
 
+/* ---------- 改善（施策ごとのきっかけ・変更前後の数字・判定） ----------
+   元：商品改善ログの「記録」タブ（きっかけ＝「きっかけ・なぜ」列）＋写真２のAIサムネ＋検証結果の自動検出（売れ値・商品名）。
+   判定は商品改善ログの週次の検証（変更前14日 vs 変更後7日・同じカテゴリの自社品番の動きを差し引き）。下の数字はその素の値 */
+const IMP_BEFORE = 14, IMP_AFTER = 7;
+const IMP_M = [
+  { k: 'uu', l: 'UU／日', n: 'uu', day: 1 },
+  { k: 'pv', l: 'PV／日', n: 'pv', day: 1 },
+  { k: 'ctr', l: '広告クリック率', n: 'ad.click', d: 'ad.imp', dg: 2, min: 300 },
+  { k: 'fav', l: 'お気に入り率', n: 'fav', d: 'pv', dg: 1, min: 50 },
+  { k: 'cart', l: 'カート率', n: 'cart', d: 'uu', dg: 1, min: 30 },
+  { k: 'cvr', l: 'CVR', n: 'buyers', d: 'uu', dg: 2, min: 30 },
+  { k: 'f2b', l: 'お気→購入率', n: 'buyers', d: 'fav', dg: 1, min: 10 },
+  { k: 'units', l: '受注点数／日', n: 'units', day: 1, dg: 1 },
+  { k: 'amt', l: '受注額／日（税抜）', n: 'amt', day: 1, yen: 1 },
+  { k: 'price', l: '売れ値（税込）', price: 1 }];
+const IMP_GOAL = { '露出（UU）': 'uu', '露出（PV）': 'pv', '広告クリック率': 'ctr', 'お気に入り率': 'fav', 'カート率': 'cart', 'CVR': 'cvr', 'お気→購入率': 'f2b', '受注点数': 'units', '受注額': 'amt' };
+const IMP_KIND_GOAL = { '画像（サムネ）': 'uu', '画像（2枚目以降）': 'fav', '商品名': 'uu', '商品説明・タグ': 'cart', '値下げ・値上げ': 'units', 'クーポン': 'units', 'セール・TS': 'units',
+  '広告（出稿・入札）': 'uu', 'ランキング・特集枠': 'uu', '在庫・サイズ補充': 'cvr', '新色・新サイズ追加': 'units' };
+const IMP_SHOW = ['pv', 'ctr', 'fav', 'cart', 'cvr', 'units', 'price'];   // いつも出す行（狙いがほかの数字ならその行も足す）
+const escH = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const IMP_END = () => ({ perf: idxOf(D.asof['商品別実績']), ad: idxOf(D.asof['広告']), price: SKU_END });
+function impVal(src, m, s, e) {
+  if (!src) return null;
+  const E = IMP_END(), end = m.price ? E.price : m.d && m.d.startsWith('ad.') ? E.ad : E.perf;
+  e = Math.min(e, end); s = Math.max(s, 0); if (e < s) return null;
+  if (m.price) { let t = 0, k = 0; for (let i = s; i <= e; i++) if (src.price && src.price[i] != null) { t += src.price[i]; k++; } return k ? t / k : null; }
+  if (m.day) { const t = sumR(AR(src, m.n), s, e); return t == null ? null : t / (e - s + 1); }
+  const a = sumR(AR(src, m.n), s, e), b = sumR(AR(src, m.d), s, e);
+  return b && b >= (m.min || 1) ? (a || 0) / b : null;
+}
+const impFmt = (m, v) => v == null ? '—' : m.price || m.yen ? yen(v) : m.day ? num(v, m.dg || 0) : pct(v, m.dg);
+const impChg = (a, b) => a == null || b == null || !b ? null : a / b - 1;
+function impChgTxt(x, neutral) {
+  if (x == null) return '<span class="flat">—</span>';
+  const cls = Math.abs(x) < .05 || neutral ? 'flat' : x > 0 ? 'up' : 'down';
+  return `<span class="${cls} num">${x > 0 ? '+' : ''}${Math.round(x * 100)}%</span>`;
+}
+function impVerdict(ex, i, isRec) {
+  const v = ex && ex.v, pe = IMP_END().perf;
+  if (!v) return i + IMP_AFTER - 1 > pe
+    ? `<span class="pill warn">⏳ 判定待ち</span><span class="foot">変更後${IMP_AFTER}日（${md(new Date(DAYS[i].getTime() + (IMP_AFTER - 1) * 864e5))}まで）のデータが入ると、週次更新の商品改善ログで判定されます</span>`
+    : isRec ? `<span class="pill info">判定まだ</span><span class="foot">次の週次更新で商品改善ログを回すと判定が出ます</span>`
+    : `<span class="chip">判定なし</span><span class="foot">自動で見つけた変更のうち数が少ないものは、商品改善ログでは判定していません（下の数字で見てください）</span>`;
+  const cls = v[0] === '◎' ? 'good' : v[0] === '✕' ? 'crit' : v[0] === '⏳' ? 'warn' : 'info';
+  return `<span class="pill ${cls}">${escH(v.split('（')[0])}</span><span class="foot">${escH(v.slice(v.split('（')[0].length))}${ex.r ? '　' + escH(ex.r) : ''}</span>`;
+}
+function impCard(pr, a, k, all) {
+  const [i, kind, content, src] = a, ex = a[4] || {}, B = BR(pr);
+  const gk = IMP_GOAL[ex.g] || (kind === '値下げ・値上げ' && /[（(]\+\d+%[）)]/.test(content) ? 'amt' : IMP_KIND_GOAL[kind]) || 'units'   /* 値上げは受注額で見る（商品改善ログと同じ） */, goalTxt = ex.g || (IMP_M.find(m => m.k === gk) || {}).l;
+  const bs = i - IMP_BEFORE, be = i - 1, as = i, ae = i + IMP_AFTER - 1, pe = IMP_END().perf, nA = Math.min(ae, pe) - as + 1;
+  const keys = IMP_SHOW.includes(gk) ? IMP_SHOW : [...IMP_SHOW.slice(0, -1), gk, 'price'];
+  const rows = IMP_M.filter(m => keys.includes(m.k)).map(m => {
+    const b = impVal(pr, m, bs, be), af = nA > 0 ? impVal(pr, m, as, ae) : null;
+    const bb = m.price ? null : impVal(B, m, bs, be), ba = m.price || nA <= 0 ? null : impVal(B, m, as, ae);
+    const cp = impChg(af, b), cb = impChg(ba, bb), adj = cp != null && cb != null ? (1 + cp) / (1 + cb) - 1 : null;
+    return `<tr class="${m.k === gk ? 'goal' : ''}"><td class="l">${m.l}${m.k === gk ? '<span class="band g" style="margin-left:6px">狙い</span>' : ''}</td><td>${impFmt(m, b)}</td><td>${impFmt(m, af)}</td><td>${impChgTxt(cp, m.price)}</td>
+      <td>${m.price ? '<span class="flat">—</span>' : impChgTxt(cb, true)}</td><td>${m.price ? '<span class="flat">—</span>' : impChgTxt(adj)}</td></tr>`;
+  }).join('');
+  const near = all.filter(o => o !== a && o[0] >= i - IMP_BEFORE + 1 && o[0] <= i + IMP_AFTER - 1).map(o => `${o[1]}（${md(DAYS[o[0]])}）`);
+  const isRec = String(src).startsWith('記録');
+  return `<div class="imp-card" id="imp${k}">
+    <div class="imp-h"><span class="dt">${mdw(DAYS[i])}</span><span class="chip strong">${escH(kind)}</span><span class="ct">${escH(content)}</span>
+      <span class="chip${isRec ? '' : ' flat'}" title="${isRec ? '商品改善ログの「記録」タブ' : '自動で見つけた変更'}">${isRec ? '記録' : '自動'}</span></div>
+    ${ex.w ? `<div class="imp-why"><b>きっかけ</b>${escH(ex.w)}</div>` : isRec ? '<div class="imp-why flat"><b>きっかけ</b>未記入（「記録」タブの「きっかけ・なぜ」列に書くとここに出ます）</div>' : ''}
+    ${ex.b || ex.a ? `<div class="foot" style="margin:4px 0">変更前：${escH(ex.b || '—')}　→　変更後：${escH(ex.a || '—')}</div>` : ''}
+    <div class="imp-v"><span class="foot">狙い：<b style="color:var(--ink)">${escH(goalTxt)}</b></span>${impVerdict(ex, i, isRec)}</div>
+    <div style="overflow-x:auto"><table class="imp-tbl"><thead><tr><th class="l"></th><th>変更前${IMP_BEFORE}日</th><th>変更後${nA > 0 ? Math.min(nA, IMP_AFTER) + '日' : '（まだ）'}${nA > 0 && nA < IMP_AFTER ? '<small class="flat">途中</small>' : ''}</th><th>変化</th><th>ブランド全体</th><th>ブランドの動きを除く</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="foot" style="margin-top:4px">変更前 ${md(DAYS[Math.max(0, bs)])}〜${md(DAYS[Math.max(0, be)])}・変更後 ${md(DAYS[as])}〜${nA > 0 ? md(DAYS[Math.min(ae, pe)]) : '（データ待ち）'}${near.length ? '　<span style="color:var(--warn)">※同じ時期にほかの施策あり：' + near.join('、') + '（数字にはそれも混ざります）</span>' : ''}</div>
+  </div>`;
+}
+function renderImprove(v) {
+  const pr = P[state.p], acts = (pr.acts || []).slice().sort((x, y) => x[0] - y[0] || String(x[1]).localeCompare(String(y[1])));
+  const note = '施策は商品改善ログの「記録」タブ（きっかけは「きっかけ・なぜ」列）、写真２のAIサムネ、売れ値・商品名の自動検出から。判定は週次更新で商品改善ログを回したときの結果（変更前14日 vs 変更後7日・同じカテゴリの自社品番の動きを差し引き）。';
+  if (!acts.length) { v.innerHTML = `<div class="panel empty">この品番の施策の記録はまだありません。<br><span class="foot">${note}</span></div>`; return; }
+  const s0 = prStart(pr), pe = IMP_END().perf, bs = buckets(Math.max(s0, acts[0][0] - 56), pe, 'week');
+  const bIdx = i => bs.findIndex(b => i >= b.s && i <= b.e);
+  const evs = acts.map(a => ({ i: bIdx(a[0]), kind: a[1] === '値下げ・値上げ' ? (/[-−]\d+%/.test(a[2]) ? 'down' : 'up') : 'img' })).filter(e => e.i >= 0);
+  const wr = (n, d, min) => bs.map(b => { const x = bsum(AR(pr, d), b); return x && x >= min ? (bsum(AR(pr, n), b) || 0) / x : null; });
+  const nRec = acts.filter(a => String(a[3]).startsWith('記録')).length, SHOWN = 8, old = acts.length > SHOWN ? acts.slice(0, acts.length - SHOWN) : [], recent = acts.slice(old.length);
+  const card = (a, k, arr) => impCard(pr, a, k, acts);
+  const link = (a, b) => `<div class="imp-link">↓ ${Math.round((b[0] - a[0]))}日後</div>`;
+  const tl = arr => arr.map((a, k) => (k ? link(arr[k - 1], a) : '') + card(a, acts.indexOf(a), arr)).join('');
+  v.innerHTML = `
+    <div class="panel"><div class="ph"><h2>何を変えて、どうなったか</h2><span class="sub">施策 ${acts.length}件（記録 ${nRec}・自動 ${acts.length - nRec}）・古い順</span></div>
+      <div class="foot" style="margin-bottom:8px">◆＝施策（画像・商品名・説明など）、▼▲＝売れ値の変更。数字は週ごと（最後の週は${md(DAYS[pe])}までの途中）</div>
+      <div class="grid g2">
+        <div><div class="row-title"><b>広告クリック率</b><span>週の表示300回未満は線を切る</span></div><div class="chart" id="im1"></div></div>
+        <div><div class="row-title"><b>CVR</b><span>購入者 ÷ UU</span></div><div class="chart" id="im2"></div></div>
+        <div><div class="row-title"><b>お気に入り率</b><span>お気に入り ÷ PV</span></div><div class="chart" id="im3"></div></div>
+        <div><div class="row-title"><b>PV（週）</b><span>商品別実績</span></div><div class="chart" id="im4"></div></div>
+      </div></div>
+    <div class="panel"><div class="ph"><h2>施策の流れ</h2><span class="sub">きっかけ → 変えたこと → 前後の数字 → 判定</span></div>
+      ${old.length ? `<details style="margin-bottom:8px"><summary>それより前の施策 ${old.length}件</summary><div class="imp-tl">${tl(old)}</div></details>` : ''}
+      <div class="imp-tl">${tl(recent)}</div>
+      <div class="foot" style="margin-top:10px">${note}</div></div>`;
+  const grp = [], ctr = wr('ad.click', 'ad.imp', 300), cvr = wr('buyers', 'uu', 30), fav = wr('fav', 'pv', 50), pvw = bs.map(b => bsum(pr.pv, b));
+  tipFn = i => { const b = bs[i], row = (l, x) => `<div class="r"><span>${l}</span><span>${x}</span></div>`;
+    const here = acts.filter(a => a[0] >= b.s && a[0] <= b.e).map(a => `<div class="r"><span>◆${md(DAYS[a[0]])}</span><span>${escH(a[1])}</span></div>`).join('');
+    return `<h4>${b.label}</h4>` + row('広告クリック率', pct(ctr[i], 2)) + row('CVR', pct(cvr[i], 2)) + row('お気に入り率', pct(fav[i], 1)) + row('PV', num(pvw[i])) + here; };
+  const common = { buckets: bs, group: grp, events: evs, h: 130 };
+  chart($('#im1'), { ...common, id: ++CID, kind: 'pct', series: [{ type: 'line', color: 'var(--s7)', values: ctr }] });
+  chart($('#im2'), { ...common, id: ++CID, kind: 'pct', refs: CRIT_REFS.cvr, series: [{ type: 'line', color: 'var(--s1)', values: cvr }] });
+  chart($('#im3'), { ...common, id: ++CID, kind: 'pct', refs: CRIT_REFS.favpv, series: [{ type: 'line', color: 'var(--s3)', values: fav }] });
+  chart($('#im4'), { ...common, id: ++CID, series: [{ type: 'bar', color: 'var(--s1)', values: pvw }] });
+}
+
 /* ---------- 引き出し ---------- */
 function openDrawer(title, sub, html, after) {
   $('#dtitle').textContent = title; $('#dsub').innerHTML = sub; $('#dbody').innerHTML = html;
@@ -1423,7 +1541,7 @@ addEventListener('message', e => { const m = e.data || {}; if (m.type === 'karte
 function renderAll() {
   renderChrome(); const v = $('#view'); hideTip();
   v.className = 'grid';
-  ({ overview: renderOverview, daily: renderDaily, sku: renderSku, ad: renderAd })[state.tab](v);
+  ({ overview: renderOverview, daily: renderDaily, sku: renderSku, ad: renderAd, improve: renderImprove })[state.tab](v);
 }
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(renderAll, 150); });
 addEventListener('keydown', ev => { if (ev.target.closest('input,select,textarea') || $('#drawer').classList.contains('on')) return;
