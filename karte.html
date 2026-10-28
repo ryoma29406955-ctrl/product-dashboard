@@ -292,7 +292,7 @@ details summary{cursor:pointer;color:var(--accent);font-size:12.5px;padding:6px 
 </aside>
 <div class="tip" id="tip"></div>
 
-<script src="karte_data.js?v=20261028143003"></script>
+<script src="karte_data.js?v=20261028143550"></script>
 <script>
 const D = window.KARTE_DATA;
 if (!D) document.body.innerHTML = '<p style="padding:24px">カルテのデータ（karte_data.js）が見つかりません。商品ステータスと同じフォルダに置いてください。</p>';
@@ -307,12 +307,13 @@ window.KD = (h, obj) => { P[h] = toTaxIn(obj); (_kdWait[h] || []).forEach(f => f
 function loadP(h, cb) {
   if (P[h]) return cb();
   const first = !_kdWait[h]; (_kdWait[h] = _kdWait[h] || []).push(cb); if (!first) return;
-  const s = document.createElement('script'); s.src = 'karte_d/' + encodeURIComponent(h) + '.js?v=20261028143003';
+  const s = document.createElement('script'); s.src = 'karte_d/' + encodeURIComponent(h) + '.js?v=20261028143550';
   s.onerror = () => { delete _kdWait[h]; const v = document.getElementById('view'); if (v) v.innerHTML = '<div class="panel empty">この品番のデータ（karte_d/' + h + '.js）が見つかりません</div>'; };
   document.head.appendChild(s);
 }
 const DAYS = D.days.map(s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); });
 const N = DAYS.length, DOW = '日月火水木金土';
+const dayAt = i => DAYS[i] || new Date(DAYS[N - 1].getTime() + (i - N + 1) * 864e5);   // データの最後の日より後（施策の日など）も日付にする
 const idxOf = s => D.days.indexOf(s);
 const SKU_END = idxOf(D.asof['売上集計']), RANK_END = idxOf(D.asof['ランキング']);
 const md = d => (d.getMonth() + 1) + '/' + d.getDate();
@@ -1434,7 +1435,7 @@ function impChgTxt(x, neutral) {
 function impVerdict(ex, i, isRec) {
   const v = ex && ex.v, pe = IMP_END().perf;
   if (!v) return i + IMP_AFTER - 1 > pe
-    ? `<span class="pill warn">⏳ 判定待ち</span><span class="foot">変更後${IMP_AFTER}日（${md(new Date(DAYS[i].getTime() + (IMP_AFTER - 1) * 864e5))}まで）のデータが入ると、週次更新の商品改善ログで判定されます</span>`
+    ? `<span class="pill warn">⏳ 判定待ち</span><span class="foot">変更後${IMP_AFTER}日（${md(new Date(dayAt(i).getTime() + (IMP_AFTER - 1) * 864e5))}まで）のデータが入ると、週次更新の商品改善ログで判定されます</span>`
     : isRec ? `<span class="pill info">判定まだ</span><span class="foot">次の週次更新で商品改善ログを回すと判定が出ます</span>`
     : `<span class="chip">判定なし</span><span class="foot">自動で見つけた変更のうち数が少ないものは、商品改善ログでは判定していません（下の数字で見てください）</span>`;
   const cls = v[0] === '◎' ? 'good' : v[0] === '✕' ? 'crit' : v[0] === '⏳' ? 'warn' : 'info';
@@ -1452,16 +1453,16 @@ function impCard(pr, a, k, all) {
     return `<tr class="${m.k === gk ? 'goal' : ''}"><td class="l">${m.l}${m.k === gk ? '<span class="band g" style="margin-left:6px">狙い</span>' : ''}</td><td>${impFmt(m, b)}</td><td>${impFmt(m, af)}</td><td>${impChgTxt(cp, m.price)}</td>
       <td>${m.price ? '<span class="flat">—</span>' : impChgTxt(cb, true)}</td><td>${m.price ? '<span class="flat">—</span>' : impChgTxt(adj)}</td></tr>`;
   }).join('');
-  const near = all.filter(o => o !== a && o[0] >= i - IMP_BEFORE + 1 && o[0] <= i + IMP_AFTER - 1).map(o => `${o[1]}（${md(DAYS[o[0]])}）`);
+  const near = all.filter(o => o !== a && o[0] >= i - IMP_BEFORE + 1 && o[0] <= i + IMP_AFTER - 1).map(o => `${o[1]}（${md(dayAt(o[0]))}）`);
   const isRec = String(src).startsWith('記録');
   return `<div class="imp-card" id="imp${k}">
-    <div class="imp-h"><span class="dt">${mdw(DAYS[i])}</span><span class="chip strong">${escH(kind)}</span><span class="ct">${escH(content)}</span>
+    <div class="imp-h"><span class="dt">${mdw(dayAt(i))}</span><span class="chip strong">${escH(kind)}</span><span class="ct">${escH(content)}</span>
       <span class="chip${isRec ? '' : ' flat'}" title="${isRec ? '商品改善ログの「記録」タブ' : '自動で見つけた変更'}">${isRec ? '記録' : '自動'}</span></div>
     ${ex.w ? `<div class="imp-why"><b>きっかけ</b>${escH(ex.w)}</div>` : isRec ? '<div class="imp-why flat"><b>きっかけ</b>未記入（「記録」タブの「きっかけ・なぜ」列に書くとここに出ます）</div>' : ''}
     ${ex.b || ex.a ? `<div class="foot" style="margin:4px 0">変更前：${escH(ex.b || '—')}　→　変更後：${escH(ex.a || '—')}</div>` : ''}
     <div class="imp-v"><span class="foot">狙い：<b style="color:var(--ink)">${escH(goalTxt)}</b></span>${impVerdict(ex, i, isRec)}</div>
     <div style="overflow-x:auto"><table class="imp-tbl"><thead><tr><th class="l"></th><th>変更前${IMP_BEFORE}日</th><th>変更後${nA > 0 ? Math.min(nA, IMP_AFTER) + '日' : '（まだ）'}${nA > 0 && nA < IMP_AFTER ? '<small class="flat">途中</small>' : ''}</th><th>変化</th><th>ブランド全体</th><th>ブランドの動きを除く</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="foot" style="margin-top:4px">変更前 ${md(DAYS[Math.max(0, bs)])}〜${md(DAYS[Math.max(0, be)])}・変更後 ${md(DAYS[as])}〜${nA > 0 ? md(DAYS[Math.min(ae, pe)]) : '（データ待ち）'}${near.length ? '　<span style="color:var(--warn)">※同じ時期にほかの施策あり：' + near.join('、') + '（数字にはそれも混ざります）</span>' : ''}</div>
+    <div class="foot" style="margin-top:4px">変更前 ${md(dayAt(Math.max(0, bs)))}〜${md(dayAt(Math.max(0, be)))}・変更後 ${md(dayAt(as))}〜${nA > 0 ? md(DAYS[Math.min(ae, pe)]) : '（データ待ち）'}${near.length ? '　<span style="color:var(--warn)">※同じ時期にほかの施策あり：' + near.join('、') + '（数字にはそれも混ざります）</span>' : ''}</div>
   </div>`;
 }
 function renderImprove(v) {
@@ -1491,7 +1492,7 @@ function renderImprove(v) {
       <div class="foot" style="margin-top:10px">${note}</div></div>`;
   const grp = [], ctr = wr('ad.click', 'ad.imp', 300), cvr = wr('buyers', 'uu', 30), fav = wr('fav', 'pv', 50), pvw = bs.map(b => bsum(pr.pv, b));
   tipFn = i => { const b = bs[i], row = (l, x) => `<div class="r"><span>${l}</span><span>${x}</span></div>`;
-    const here = acts.filter(a => a[0] >= b.s && a[0] <= b.e).map(a => `<div class="r"><span>◆${md(DAYS[a[0]])}</span><span>${escH(a[1])}</span></div>`).join('');
+    const here = acts.filter(a => a[0] >= b.s && a[0] <= b.e).map(a => `<div class="r"><span>◆${md(dayAt(a[0]))}</span><span>${escH(a[1])}</span></div>`).join('');
     return `<h4>${b.label}</h4>` + row('広告クリック率', pct(ctr[i], 2)) + row('CVR', pct(cvr[i], 2)) + row('お気に入り率', pct(fav[i], 1)) + row('PV', num(pvw[i])) + here; };
   const common = { buckets: bs, group: grp, events: evs, h: 130 };
   chart($('#im1'), { ...common, id: ++CID, kind: 'pct', series: [{ type: 'line', color: 'var(--s7)', values: ctr }] });
