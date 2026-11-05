@@ -35,6 +35,19 @@ th:hover{background:#dce7f3;}
 .cfx{width:100%;box-sizing:border-box;font-size:10px;padding:2px 3px;border:1px solid #ccc;border-radius:3px;}
 th.sorted{background:#2e74b5;color:#fff;}
 th .sx{opacity:.3;font-size:9px;}
+th .pin{font-size:9px;cursor:pointer;margin-right:3px;filter:grayscale(1);opacity:.35;}
+th .pin:hover{opacity:1;}
+th .pin.on{filter:none;opacity:1;}
+#lt th{z-index:2;}
+#lt .mkc{position:sticky;left:0;z-index:1;width:24px;min-width:24px;padding:0;text-align:center;background:#fff;cursor:pointer;}
+#lt th.mkc{z-index:3;background:#eef3f9;cursor:default;}
+#lt .frow th.mkc{background:#fff;}
+.mkd{display:inline-block;width:10px;height:10px;border-radius:50%;border:1px solid #b5b5b5;vertical-align:middle;}
+#lt td.mkc:hover .mkd{border-color:#d9a800;background:#fff2a8;}
+:where(#lt tr.mk td){background:#fff2a8;}
+#lt tr.mk td{box-shadow:inset 0 1px 0 #d9b100,inset 0 -1px 0 #d9b100;}
+#lt tr.mk td.mkc{background:#fff2a8;}
+#lt tr.mk .mkd{background:#f5c400;border-color:#c79a00;}
 .movtbl{table-layout:fixed;width:100%;}
 .movtbl td,.movtbl th{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 td.l,th.l{text-align:left;}
@@ -586,7 +599,9 @@ function renderList(){
       <button onclick="clearFilters()" style="font-size:12px;padding:6px 12px;border:1px solid #ccc;background:#fff;border-radius:5px;cursor:pointer">フィルタ全消去</button>
       <span class="muted" id="lcount"></span>
       <span class="muted" id="sortInfo"></span>
-      <span class="muted">｜見出しクリックでソート / 数値列は 5・&gt;5・&lt;5・3-10 で絞込</span>
+      <span class="muted">｜見出しクリックでソート / 数値列は 5・&gt;5・&lt;5・3-10 で絞込 / 📌で列を左に固定 / 左端の○で行に色</span>
+      <span class="muted" id="pinInfo"></span>
+      <span class="muted" id="markInfo"></span>
     </div>
     <div class="legend-crit">色の基準（最新週）：PV <span class="cmain">3,000以上＝主力</span><span class="good">1,000以上</span>　お気に入り率（÷PV） <span class="good">6%以上</span><span class="mid">4〜6%</span><span class="bad">4%未満</span>　CVR <span class="good">1.5%以上</span><span class="mid">1.0〜1.5%</span><span class="bad">1.0%未満</span>　（PV300未満のお気に入り率・UU300未満のCVRは色なし${WK_FULL?'':'／最新週が途中なのでPVは色なし'}）<br>AI画像：<span class="aib aib-thumb">サムネだけ</span> <span class="aib aib-part">一部</span> <span class="aib aib-all">全部</span>＋発売時から／途中から・AIにした日。点線の枠は推定（商品改善ログの「AI画像」タブで直すと消える）</div>
     <div style="overflow:auto;max-height:72vh" id="lt"></div>
@@ -603,10 +618,53 @@ function filteredSorted(){
   rows.sort((a,b)=>{const x=valOf(a,sortKey),y=valOf(b,sortKey);return (x>y?1:x<y?-1:0)*sortDir;});
   return rows;
 }
+// 列の固定（📌）。固定した列は押した順に左へ寄せて、横に動かしても残す。端末ごとに覚える
+const pinKey=c=>c.k||c.l;
+let PINS=[];
+try{PINS=JSON.parse(localStorage.getItem('pd.pins')||'[]').filter(k=>COLS.some(c=>pinKey(c)===k));}catch(e){}
+function savePins(){try{localStorage.setItem('pd.pins',JSON.stringify(PINS));}catch(e){}}
+function togglePin(e,k){e.stopPropagation();PINS=PINS.includes(k)?PINS.filter(x=>x!==k):PINS.concat(k);savePins();renderTable();}
+function clearPins(){PINS=[];savePins();renderTable();}
+function orderedCols(){return PINS.map(k=>COLS.find(c=>pinKey(c)===k)).concat(COLS.filter(c=>!PINS.includes(pinKey(c))));}
+// 行の色付け（左端の○）。品番で覚えるので、並び替えや絞り込みをしても付いてくる
+let MARKS=new Set();
+try{MARKS=new Set(JSON.parse(localStorage.getItem('pd.marks')||'[]'));}catch(e){}
+function saveMarks(){try{localStorage.setItem('pd.marks',JSON.stringify([...MARKS]));}catch(e){}}
+function markInfo(){const el=document.getElementById('markInfo');if(el)el.innerHTML=MARKS.size?'｜色付き: <b>'+MARKS.size+'行</b> <a href="#" onclick="clearMarks();return false">全部消す</a>':'';}
+function toggleMark(e,h){e.stopPropagation();const tr=e.currentTarget.parentElement;if(MARKS.has(h)){MARKS.delete(h);tr.classList.remove('mk');}else{MARKS.add(h);tr.classList.add('mk');}saveMarks();markInfo();}
+function clearMarks(){MARKS=new Set();saveMarks();renderBody();}
+function pinBtn(c){const k=pinKey(c),on=PINS.includes(k);return `<span class="pin${on?' on':''}" onclick="togglePin(event,'${k}')" title="${on?'固定を外す':'この列を固定'}">📌</span>`;}
+function applyPins(){
+  let st=document.getElementById('pinStyle');
+  if(!st){st=document.createElement('style');st.id='pinStyle';document.head.append(st);}
+  const n=PINS.length,info=document.getElementById('pinInfo');
+  const setInfo=m=>{if(info)info.innerHTML=n?'｜固定中: <b>'+orderedCols().slice(0,n).map(c=>c.l).join('・')+'</b>'+m+' <a href="#" onclick="clearPins();return false">全部外す</a>':'';};
+  setInfo('');
+  if(!n){st.textContent='';return;}
+  // 狭い画面（スマホ）では固定する列の幅を詰める。詰めても画面の7割を超える列は固定しない（残りの列を見られなくなるので）
+  const box=document.getElementById('lt').clientWidth;
+  let wid='';
+  if(box<700)for(let i=2;i<=n+1;i++)wid+='#lt td:nth-child('+i+'),#lt th:nth-child('+i+'){max-width:110px;overflow:hidden;text-overflow:ellipsis}';
+  st.textContent=wid;
+  // 1列目は行の色付けの○なので、固定した列はその右から
+  const ths=document.querySelectorAll('#lt thead tr:first-child th');
+  let left=ths[0].getBoundingClientRect().width,css=wid,stuck=0;
+  for(let i=1;i<=n;i++){
+    const nth=':nth-child('+(i+1)+')',w=ths[i].getBoundingClientRect().width;
+    if(left+w>box*0.7)break;
+    stuck=i;
+    // :where は色分けのクラス（.good など）と行の色に負けるように。色のないセルだけ白で埋める
+    css+='#lt th'+nth+'{left:'+left+'px;z-index:3}#lt td'+nth+'{position:sticky;left:'+left+'px;z-index:1}:where(#lt tr:not(.mk) td'+nth+'){background:#fff}:where(#lt tr:not(.mk):hover td'+nth+'){background:#f0f6ff}';
+    left+=w;
+  }
+  if(stuck<n)setInfo('（画面が狭いので '+orderedCols().slice(stuck,n).map(c=>c.l).join('・')+' は左に寄せるだけ）');
+  st.textContent=css+(stuck?'#lt th:nth-child('+(stuck+1)+'),#lt td:nth-child('+(stuck+1)+'){box-shadow:2px 0 3px rgba(0,0,0,.18)}':'');
+}
 function renderTable(){
-  const th=c=>c.k?`<th class="${c.cls||''}${sortKey===c.k?' sorted':''}" onclick="setSort('${c.k}')">${c.l}${sortKey===c.k?(sortDir<0?' ▼':' ▲'):' <span class="sx">⇅</span>'}</th>`:`<th>${c.l}</th>`;
+  const th=c=>c.k?`<th class="${c.cls||''}${sortKey===c.k?' sorted':''}" onclick="setSort('${c.k}')">${pinBtn(c)}${c.l}${sortKey===c.k?(sortDir<0?' ▼':' ▲'):' <span class="sx">⇅</span>'}</th>`:`<th>${pinBtn(c)}${c.l}</th>`;
   const fx=c=>c.k?`<th class="${c.cls||''}"><input class="cfx" value="${colF[c.k]||''}" oninput="onColFilter('${c.k}',this.value)" placeholder="${c.t==='num'?'例:5':'含む'}"></th>`:'<th></th>';
-  let h=`<table><thead><tr>${COLS.map(th).join('')}</tr><tr class="frow">${COLS.map(fx).join('')}</tr></thead><tbody id="ltbody"></tbody></table>`;
+  const cols=orderedCols();
+  let h=`<table><thead><tr><th class="mkc" title="左端の○を押すと行に色が付きます"></th>${cols.map(th).join('')}</tr><tr class="frow"><th class="mkc"></th>${cols.map(fx).join('')}</tr></thead><tbody id="ltbody"></tbody></table>`;
   document.getElementById('lt').innerHTML=h;
   const _sc=COLS.find(c=>c.k===sortKey),_si=document.getElementById('sortInfo');
   if(_si&&_sc)_si.innerHTML='並び替え: <b>'+_sc.l+'</b> '+(sortDir<0?'降順 ▼':'昇順 ▲');
@@ -617,7 +675,7 @@ function renderBody(){
   const f2bArr=P.map(p=>p.cur.fav2buy);
   let h='';
   rows.forEach(p=>{
-    h+=`<tr onclick="openDetail('${p.h}')">
+    h+=`<tr class="${MARKS.has(p.h)?'mk':''}" onclick="openDetail('${p.h}')"><td class="mkc" title="この行に色を付ける" onclick="toggleMark(event,'${p.h}')"><span class="mkd"></span></td>
       <td class="l"><b>${p.h}</b> <a href="${zozoUrl(p)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="ZOZOで検索" style="text-decoration:none">🔗</a>${p.isnew?' <span class="newb">NEW</span>':''}</td>
       <td class="l">${p.brand||''}</td>
       <td class="l">${p.n.slice(0,24)}</td><td class="l"><span class="pill">${p.c}</span></td><td class="l" style="white-space:nowrap">${aiCell(p)}</td>
@@ -634,7 +692,11 @@ function renderBody(){
       <td>${p.age==null?'—':p.age+'歳'}</td>
       <td>${pct(p.cur.newrate)}</td><td class="l">${p.rel||p.start||''}</td><td>${spark(p.uu.slice(-12))}</td></tr>`;
   });
-  document.getElementById('ltbody').innerHTML=h;
+  const body=document.getElementById('ltbody');
+  body.innerHTML=h;
+  if(PINS.length){const idx=orderedCols().map(c=>COLS.indexOf(c));for(const tr of body.children){const cs=[...tr.children];tr.replaceChildren(cs[0],...idx.map(i=>cs[i+1]));}}
+  applyPins();
+  markInfo();
   document.getElementById('lcount').textContent=rows.length+'品番 / 行クリックで商品カルテ';
 }
 function setSort(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=-1;}renderTable();}
