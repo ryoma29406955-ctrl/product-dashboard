@@ -292,7 +292,7 @@ details summary{cursor:pointer;color:var(--accent);font-size:12.5px;padding:6px 
 </aside>
 <div class="tip" id="tip"></div>
 
-<script src="karte_data.js?v=20261104120906"></script>
+<script src="karte_data.js?v=20261105111137"></script>
 <script>
 const D = window.KARTE_DATA;
 if (!D) document.body.innerHTML = '<p style="padding:24px">カルテのデータ（karte_data.js）が見つかりません。商品ステータスと同じフォルダに置いてください。</p>';
@@ -307,7 +307,7 @@ window.KD = (h, obj) => { P[h] = toTaxIn(obj); (_kdWait[h] || []).forEach(f => f
 function loadP(h, cb) {
   if (P[h]) return cb();
   const first = !_kdWait[h]; (_kdWait[h] = _kdWait[h] || []).push(cb); if (!first) return;
-  const s = document.createElement('script'); s.src = 'karte_d/' + encodeURIComponent(h) + '.js?v=20261104120906';
+  const s = document.createElement('script'); s.src = 'karte_d/' + encodeURIComponent(h) + '.js?v=20261105111137';
   s.onerror = () => { delete _kdWait[h]; const v = document.getElementById('view'); if (v) v.innerHTML = '<div class="panel empty">この品番のデータ（karte_d/' + h + '.js）が見つかりません</div>'; };
   document.head.appendChild(s);
 }
@@ -909,10 +909,12 @@ function renderOverview(v) {
       <span class="d num ${d == null || Math.abs(d) < .05 ? 'flat' : d > 0 ? 'up' : 'down'}">${t.pl} ${pct(t.pv, t.r.dg)}${d == null ? '' : `（${t.pfx}${Math.abs(d) < .5 * Math.pow(10, -t.r.dg) ? '±0' : (d > 0 ? '+' : '') + d.toFixed(t.r.dg)}pt）`}</span>
       <span class="d num ${vb == null ? 'flat' : vb >= 0 ? 'up' : 'down'}">${t.bl} ${pct(t.br, t.r.dg)}${vb == null ? '' : vb >= 0 ? ' を上回る' : ' を下回る'}</span>
       <span class="def">${t.r.def}${CRIT_NOTE[t.r.k] ? '<br>' + CRIT_NOTE[t.r.k] : ''}</span></div>`; };
+  // PVのうち広告クリック（クリックの後に複数ページ見ることもあるので、広告で来たPVの最低ラインの目安）
+  const adOfPv = (pv, click) => click > 0 && pv > 0 ? `<span class="d flat num">うち広告クリック ${num(click)}（${Math.round(click / pv * 100)}%）</span>` : '';
   const tiles = [
     ['受注点数', num(S(pr.units, w)), delta(S(pr.units, w), S(pr.units, wp))],
     ['受注額（税抜）', yen(S(pr.amt, w)), delta(S(pr.amt, w), S(pr.amt, wp))],
-    ['PV', num(S(pr.pv, w)) + band('pvw', S(pr.pv, w)), delta(S(pr.pv, w), S(pr.pv, wp))],
+    ['PV', num(S(pr.pv, w)) + band('pvw', S(pr.pv, w)), delta(S(pr.pv, w), S(pr.pv, wp)) + adOfPv(S(pr.pv, w), S(pr.ad.click, w))],
     ['UU', num(S(pr.uu, w)), delta(S(pr.uu, w), S(pr.uu, wp))],
     ['お気に入り', num(S(pr.fav, w)), delta(S(pr.fav, w), S(pr.fav, wp))],
     ['在庫（全チャネル）', num(stock), `<span class="d ${wk14 && stock / wk14 < 3 ? 'down' : 'flat'} num">${wk14 ? 'あと約' + (stock / wk14).toFixed(1) + '週' : '直近の売れなし'}</span>`]];
@@ -924,7 +926,7 @@ function renderOverview(v) {
     tilesShow = [
       ['受注点数', num(T.units), fl(`週平均 ${num(T.units / wk, 1)}点`)],
       ['受注額（税抜）', yen(T.amt), fl(`客単価 ${yen(T.buyers ? T.amt / T.buyers : null)}（受注額 ÷ 購入者）`)],
-      ['PV', num(T.pv), `<span class="d flat num">週平均 ${num(T.pv / wk)}${band('pvw', T.pv / wk)}</span>`],
+      ['PV', num(T.pv), `<span class="d flat num">週平均 ${num(T.pv / wk)}${band('pvw', T.pv / wk)}</span>` + adOfPv(T.pv, (T.ad || {}).click)],
       ['UU', num(T.uu), fl(`週平均 ${num(T.uu / wk)}`)],
       ['お気に入り', num(T.fav), fl(`週平均 ${num(T.fav / wk)}`)],
       ['カート投入', num(T.cart), fl(`週平均 ${num(T.cart / wk)}`)]];
